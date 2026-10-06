@@ -5,10 +5,10 @@ conventions, the release workflow and the review expectations.
 
 Before you start, two documents are worth ten minutes:
 
-- [AGENTS.md](AGENTS.md) â€” the invariants that must never be broken, whether you are a human or an
+- [AGENTS.md](AGENTS.md) — the invariants that must never be broken, whether you are a human or an
   automated agent. Every one of them is enforced by a test, a lint rule or CI, or is explicitly
   called out here.
-- [docs/DECISIONS.md](docs/DECISIONS.md) â€” why the code looks the way it does. If you are about to
+- [docs/DECISIONS.md](docs/DECISIONS.md) — why the code looks the way it does. If you are about to
   change something structural, check whether it was already decided, and read the alternatives that
   were rejected.
 
@@ -18,7 +18,7 @@ Before you start, two documents are worth ten minutes:
 
 **Requirements:** Node.js **>= 22.13** and **pnpm >= 11.5.1**.
 
-The *published package* runs on Node >= 18 â€” that is its `engines.node`, and it is what an SSR
+The *published package* runs on Node >= 18 — that is its `engines.node`, and it is what an SSR
 consumer imports. The *toolchain* needs more: pnpm 11 itself declares `engines.node: ">=22.13"`, so
 installing, building and testing all happen on Node 22 or newer, and CI runs its matrix on 22 and 24.
 The `packageManager` field pins the exact pnpm version and `pnpm/action-setup` in CI reads that field,
@@ -32,26 +32,26 @@ pnpm run verify
 ```
 
 `pnpm install` is the only setup step. There are no code-generation steps, no native builds, no
-required environment variables, and no runtime dependencies to install â€” the package has **zero**.
+required environment variables, and no runtime dependencies to install — the package has **zero**.
 
 This repository is a **pnpm workspace**: the library is the root package and every directory under
 `examples/` is a member, so a single `pnpm-lock.yaml` at the root covers the library and all five
 integration samples. `pnpm-workspace.yaml` also carries the supply-chain settings, and three of them
 change what a valid dependency edit looks like:
 
-- **`minimumReleaseAge: 10080`** â€” a version published less than seven days ago is never resolved,
+- **`minimumReleaseAge: 10080`** — a version published less than seven days ago is never resolved,
   downloaded or executed. The practical consequence: a `devDependency` range must point at a release
   that is already a week old. Writing `^1.2.3` when `1.2.3` shipped yesterday fails the install with
   `ERR_PNPM_NO_MATURE_MATCHING_VERSION`; the fix is to name the newest mature version, which is the
   entire point of the cooldown. Bumping a dependency therefore means choosing a version that is a week
   old, not the newest one.
-- **`blockExoticSubdeps: true`** â€” a transitive dependency must resolve from a registry, never from a
+- **`blockExoticSubdeps: true`** — a transitive dependency must resolve from a registry, never from a
   git URL or a raw tarball.
-- **`allowBuilds`** â€” dependency install scripts are denied unless named here. Four are approved:
+- **`allowBuilds`** — dependency install scripts are denied unless named here. Four are approved:
   `esbuild`, the platform binary that tsup and Vitest build through, plus `lmdb`, `@parcel/watcher`
   and `msgpackr-extract`, the transitive native bindings of the Angular toolchain. That toolchain is
   present only because the root devDependencies include `@angular/core` (to typecheck
-  `src/adapters/angular.ts`) â€” **not** because of anything under `examples/`, which is Markdown-only
+  `src/adapters/angular.ts`) — **not** because of anything under `examples/`, which is Markdown-only
   and installs nothing. Run `pnpm install` and rule on whatever pnpm reports: it appends a placeholder
   for every blocked package it finds.
 
@@ -67,13 +67,13 @@ peerDependencies for consumers and marked `external` in the build, so none of th
 separate jobs, plus the coverage gate in the test job.
 
 CI runs on a push to `main`, on a pull request whose base branch is `main`, and on a push to a
-release tag â€” `v*` or `@codewithrajat/rm-logvault@*`. That is the whole list: a push to a feature
+release tag — `v*` or `@codewithrajat/rm-logvault@*`. That is the whole list: a push to a feature
 branch runs nothing until its pull request against `main` is opened. A tag is **verified** and never
 published from, because publishing stays on the changesets flow below. See
 [D-024](docs/DECISIONS.md#d-024--ci-and-the-release-pipeline-run-on-main-only) and
 [D-025](docs/DECISIONS.md#d-025--ci-verifies-release-tags-and-publishing-stays-on-main-only).
 
-Formatting and linting are both **Biome** now â€” one Rust tool, one `biome.json`, no Prettier config
+Formatting and linting are both **Biome** now — one Rust tool, one `biome.json`, no Prettier config
 and no `eslint-config-prettier` shim to keep two tools agreeing. Biome is fast, and its formatting
 output is within a rounding error of the previous Prettier configuration, but it does **not** yet do
 type-aware linting: the `no-unsafe-*` family and `no-floating-promises` are no longer lint-enforced.
@@ -117,7 +117,7 @@ Every script, copied from `package.json`:
 
 | Path                 | Contents                                                                                                                                                                                                               |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm-workspace.yaml`| The workspace root marker (`packages: .` â€” the library is the only member) and the supply-chain settings: `minimumReleaseAge`, `blockExoticSubdeps` and `allowBuilds`.                                              |
+| `pnpm-workspace.yaml`| The workspace root marker (`packages: .` — the library is the only member) and the supply-chain settings: `minimumReleaseAge`, `blockExoticSubdeps` and `allowBuilds`.                                              |
 | `scripts/`           | `copy-extra-files.mjs` (build-time staging and completeness check for the published tarball) and `measure-size.mjs` (per-subpath consumer cost).                                                                        |
 | `e2e/`               | Browser end-to-end specs, driven by `playwright.config.ts`.                                                                                                                                                            |
 | `examples/`          | Runnable integrations arranged by difficulty: `01-basic` (vanilla, react, vue, nextjs, angular), `02-advanced` (vanilla, react), `03-more-advanced` (vanilla), `04-further` (vanilla) and `playground`. Each variant has its own `package.json`, `tsconfig.json` and `GUIDE.md`, and all are excluded from `tsconfig.json` and from the knip project globs. |
@@ -127,7 +127,7 @@ Every script, copied from `package.json`:
 
 CI additionally runs a browser E2E job (Playwright, Chromium/Firefox/WebKit) and a supply-chain job
 (`pnpm audit`, the OSV scanner, and a CycloneDX SBOM that is generated and validated in-run but
-**not** uploaded). The pipeline stores **no artifacts** at all â€” every job either passes or fails.
+**not** uploaded). The pipeline stores **no artifacts** at all — every job either passes or fails.
 The specs live in `e2e/`, driven by `playwright.config.ts` and run via `pnpm run test:e2e`. The
 browser download makes that script optional locally.
 
@@ -138,8 +138,8 @@ browser download makes that script optional locally.
 Commits follow [Conventional Commits](https://www.conventionalcommits.org/) and are linted by
 `commitlint` with `@commitlint/config-conventional` plus two project rules:
 
-- **`scope-enum`** â€” the scope is required to be one of a closed list.
-- **`subject-case`** â€” the subject must be sentence case or lower case.
+- **`scope-enum`** — the scope is required to be one of a closed list.
+- **`subject-case`** — the subject must be sentence case or lower case.
 - `body-max-line-length` is disabled, so conventional-commit footers (`BREAKING CHANGE:`, `Refs:`)
   do not need wrapping.
 
@@ -147,15 +147,15 @@ Commits follow [Conventional Commits](https://www.conventionalcommits.org/) and 
 
 | Scope      | Use it for                                                                                                                                                 |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `core`     | `src/core/*` â€” config resolution, initialization, state, environment access, ids, page context, the internal reporter, the serial queue, the rate limiter. |
-| `logger`   | `src/logger/*` â€” the facade, level ladder, sinks, pre-init buffering, console capture and the console writer.                                              |
-| `errors`   | `src/errors/*` â€” capture, normalisation, sanitization, fingerprinting, API classification, payload budgeting, constants.                                   |
-| `handlers` | `src/handlers/*` â€” the global DOM event handlers.                                                                                                          |
-| `storage`  | `src/storage/*` â€” IndexedDB connections, both repositories, validation, cleanup.                                                                           |
-| `sync`     | `src/sync/*` â€” the outbox, the REST contract, the transports, backoff.                                                                                     |
-| `export`   | `src/export/*` â€” the shortcut, the report template, the export pipeline, second-pass redaction.                                                            |
-| `adapters` | `src/adapters/*` â€” React, Vue, Angular, axios, fetch, TanStack Query.                                                                                      |
-| `testing`  | `src/testing/*` â€” the in-memory repository and the fake transport.                                                                                         |
+| `core`     | `src/core/*` — config resolution, initialization, state, environment access, ids, page context, the internal reporter, the serial queue, the rate limiter. |
+| `logger`   | `src/logger/*` — the facade, level ladder, sinks, pre-init buffering, console capture and the console writer.                                              |
+| `errors`   | `src/errors/*` — capture, normalisation, sanitization, fingerprinting, API classification, payload budgeting, constants.                                   |
+| `handlers` | `src/handlers/*` — the global DOM event handlers.                                                                                                          |
+| `storage`  | `src/storage/*` — IndexedDB connections, both repositories, validation, cleanup.                                                                           |
+| `sync`     | `src/sync/*` — the outbox, the REST contract, the transports, backoff.                                                                                     |
+| `export`   | `src/export/*` — the shortcut, the report template, the export pipeline, second-pass redaction.                                                            |
+| `adapters` | `src/adapters/*` — React, Vue, Angular, axios, fetch, TanStack Query.                                                                                      |
+| `testing`  | `src/testing/*` — the in-memory repository and the fake transport.                                                                                         |
 | `docs`     | `README.md`, `docs/**`, `llms.txt`, `llms-full.txt`, `AGENTS.md`, `CONTRIBUTING.md`, `CHANGELOG.md`.                                                       |
 | `ci`       | `.github/workflows/**`.                                                                                                                                    |
 | `build`    | `tsup.config.ts`, `tsconfig.json`, `vitest.config.ts`, `biome.json`, `playwright.config.ts`, `commitlint.config.js`.                                       |
@@ -205,7 +205,7 @@ BREAKING CHANGE: `attachQueryClient(client, { keys: true })` is replaced by
 
 Conventional-commit types in use: `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `build`, `ci`,
 `chore`, `revert`. A `feat` is a minor bump, a `fix` a patch, and a `!` or a `BREAKING CHANGE:`
-footer is a major bump. Because the package is pre-1.0, a breaking change may ship as a minor â€” say
+footer is a major bump. Because the package is pre-1.0, a breaking change may ship as a minor — say
 so explicitly in the changeset.
 
 ---
@@ -228,10 +228,10 @@ The prompt asks three things:
 
 1. **Which packages changed.** There is one: `@codewithrajat/rm-logvault`.
 2. **The bump type.** Choose honestly:
-   - **`patch`** â€” a bug fix, a documentation fix that ships in the tarball, an internal refactor with
+   - **`patch`** — a bug fix, a documentation fix that ships in the tarball, an internal refactor with
      no behaviour change, a dependency bump in a devDependency.
-   - **`minor`** â€” a new option, a new export, a new adapter, or (pre-1.0) a breaking change.
-   - **`major`** â€” reserved. Do not choose it before 1.0. The one thing that _is_ major-worthy is a
+   - **`minor`** — a new option, a new export, a new adapter, or (pre-1.0) a breaking change.
+   - **`major`** — reserved. Do not choose it before 1.0. The one thing that _is_ major-worthy is a
      change to `ERRORS_DB_VERSION` or `LOGS_DB_VERSION`, because it changes the on-disk format a
      previously installed version already wrote. If you are doing that, say so loudly in the changeset
      body and in the PR description.
@@ -250,8 +250,8 @@ Add `errors.captureCsp` to record Content-Security-Policy violations as
 ### What CI checks
 
 The release workflow fails a pull request that changes `src/**` or `package.json` without a changeset
-file. Documentation-only changes â€” `docs/**`, `README.md`, `llms.txt`, `llms-full.txt`,
-`CONTRIBUTING.md`, `AGENTS.md` â€” do not need one, unless the file is in the published `files`
+file. Documentation-only changes — `docs/**`, `README.md`, `llms.txt`, `llms-full.txt`,
+`CONTRIBUTING.md`, `AGENTS.md` — do not need one, unless the file is in the published `files`
 allow-list (`README.md`, `LICENSE`, `llms.txt`, `llms-full.txt`), in which case a `patch` is
 appropriate.
 
@@ -261,14 +261,14 @@ appropriate.
 2. The changesets bot opens (or updates) a **"Version Packages"** pull request. It runs
    `changeset version`, which consumes the changeset files, applies the highest bump of each type,
    updates `package.json`, and regenerates `CHANGELOG.md`.
-3. Review that pull request like any other. Check the changelog reads well â€” it is the artefact
+3. Review that pull request like any other. Check the changelog reads well — it is the artefact
    consumers see.
 4. Merging it triggers the release workflow, which runs `pnpm run build && changeset publish`. The
    package is published with `provenance: true`, so the tarball carries a Sigstore attestation tying
    it to that workflow run and commit.
 5. `changeset publish` creates the git tag and the GitHub release. The tag is pushed with the
    action's `GITHUB_TOKEN`, which GitHub does not treat as a new workflow run, so the release does
-   not start a second CI run â€” see
+   not start a second CI run — see
    [D-025](docs/DECISIONS.md#d-025--ci-verifies-release-tags-and-publishing-stays-on-main-only).
 
 `baseBranch` is `main`, `access` is `public`, and prereleases use the template
@@ -325,7 +325,7 @@ Notes for writing tests that count:
 
 - The test environment is **happy-dom**, with `globals: true` and `restoreMocks`, `clearMocks` and
   `unstubGlobals` all enabled. `vitest.setup.ts` is loaded before every file.
-- Tests run in `forks`, so a test that leaves global state behind cannot leak into another file â€”
+- Tests run in `forks`, so a test that leaves global state behind cannot leak into another file —
   but clean up anyway, with `destroyTelemetry()` in an `afterEach`.
 - Use `@codewithrajat/rm-logvault/testing` rather than mocking the library: `createMemoryRepository()` mirrors the
   IndexedDB semantics (pending-only aggregation, atomic claiming, stale-lease requeue, retention), so
@@ -363,7 +363,7 @@ an unticked box that nobody noticed is not.
 - [ ] Every new captured value goes through the sanitizer before storage and before export.
 - [ ] No new runtime dependency. (If you think one is needed, open an issue first.)
 - [ ] No new `any`, and no new type-aware-lint escape: the `no-unsafe-*` rules no longer exist, so `pnpm run typecheck` has to be green.
-- [ ] `pnpm run size` still passes â€” the core is within the 37 kB min+gzip regression budget.
+- [ ] `pnpm run size` still passes — the core is within the 37 kB min+gzip regression budget.
 - [ ] Adapter changes are in the adapter's subpath, not the core entry.
 - [ ] Tests cover the new behaviour, including the failure path, and the coverage thresholds still pass.
 - [ ] Documentation is updated: `README.md` for anything user-facing, `docs/ARCHITECTURE.md` for anything structural, `docs/DECISIONS.md` if a decision was made.
@@ -423,26 +423,26 @@ assist (enabled in `biome.json`). Markdown is **not** formatted by any tool, so 
 
 - **`any` is an error** (`suspicious.noExplicitAny`), and so is casting through `unknown` to escape a
   type error. There is one honest gap: Biome does not do type-aware linting, so the rules that caught
-  an `any` being *laundered* â€” `no-unsafe-assignment`, `no-unsafe-member-access`, `no-unsafe-call`,
-  `no-unsafe-return`, `no-unsafe-argument` â€” plus `no-floating-promises` are no longer enforced by
+  an `any` being *laundered* — `no-unsafe-assignment`, `no-unsafe-member-access`, `no-unsafe-call`,
+  `no-unsafe-return`, `no-unsafe-argument` — plus `no-floating-promises` are no longer enforced by
   the linter. Use `unknown` and narrow; `pnpm run typecheck` under `strict`,
   `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` is what catches the rest. See
   [D-016](docs/DECISIONS.md#d-016--biome-replaces-eslint-and-prettier).
 - **`import type` for type-only imports** (`style.useImportType`, which is a *warning*, so it will
   not fail `pnpm run check`). `verbatimModuleSyntax` is enabled, so a value import of a type will not
-  compile anyway â€” that is the real enforcement.
+  compile anyway — that is the real enforcement.
 - **`.js` extensions on relative imports.** The package is ESM (`"type": "module"`) and resolved with
   `moduleResolution: "Bundler"`, but the emitted output must be valid Node ESM, so the source writes
   `./foo.js` for `./foo.ts`. This is not a typo.
 - **Explicit return types on exported functions.** Inference is fine internally; the public surface
   is a contract and the declaration files should not change because a helper's return type drifted.
-- **`readonly` everywhere it is true.** This is now a review requirement rather than a lint rule â€”
-  ESLint's `prefer-readonly` has no Biome equivalent â€” but the records and options interfaces are
+- **`readonly` everywhere it is true.** This is now a review requirement rather than a lint rule —
+  ESLint's `prefer-readonly` has no Biome equivalent — but the records and options interfaces are
   pervasively readonly, including `readonly T[]` for arrays.
 - **`Maybe<T>` for optional members.** See [D-002](docs/DECISIONS.md#d-002--exactoptionalpropertytypes-with-maybet-widening).
 - **`node:` protocol for builtins** (`import { readFile } from 'node:fs/promises'`).
 - **No non-null assertions.** `style.noNonNullAssertion` is an **error** in `biome.json`, so `!` now
-  fails `pnpm run check` â€” a change from the ESLint setup, where the equivalent was a warning. Write a
+  fails `pnpm run check` — a change from the ESLint setup, where the equivalent was a warning. Write a
   guard. Tests, `src/testing/**`, `scripts/**` and `*.config.ts` are exempt by override.
 - **`_`-prefixed parameters for intentionally unused arguments.** Biome's
   `noUnusedFunctionParameters` and `noUnusedVariables` both exempt an underscore prefix; the old
@@ -459,8 +459,8 @@ These are errors, not warnings, and a suppression needs a comment explaining why
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `suspicious.noConsole`     | `console.*` is allowed only in `src/logger/consoleWriter.ts` and `src/adapters/angular.ts`, which preserves Angular's own console output. Events go through `logger`, which cannot recurse and cannot be re-captured. |
 | `security.noGlobalEval`    | No dynamic code. Biome's recommended preset turns this on at error severity.                                                                           |
-| `nursery.noImpliedEval`    | No `setTimeout('â€¦')`, no `new Function`. Recommended at error severity, so it runs under `preset: "recommended"`.                                      |
-| `security.noScriptUrl`     | No `javascript:` URLs anywhere â€” including, deliberately, as an endpoint value.                                                                        |
+| `nursery.noImpliedEval`    | No `setTimeout('…')`, no `new Function`. Recommended at error severity, so it runs under `preset: "recommended"`.                                      |
+| `security.noScriptUrl`     | No `javascript:` URLs anywhere — including, deliberately, as an endpoint value.                                                                        |
 
 ### Writing style
 
@@ -487,7 +487,7 @@ These are errors, not warnings, and a suppression needs a comment explaining why
    framework code at module scope beyond types where possible.
 2. **Route every capture through `captureError`** with a distinct `source`. If the framework is not
    already in the `ErrorSource` union, that is a type change with a corresponding entry in
-   `docs/DECISIONS.md` â€” see [D-004](docs/DECISIONS.md#d-004--errorsource-gains-vue-angular-and-svelte)
+   `docs/DECISIONS.md` — see [D-004](docs/DECISIONS.md#d-004--errorsource-gains-vue-angular-and-svelte)
    for the reasoning template.
 3. **Never replace a framework hook.** Chain it: capture the previous handler, call it afterwards, and
    let its exceptions be its own problem. Every existing adapter does this, and the Vue adapter's
@@ -508,10 +508,10 @@ These are errors, not warnings, and a suppression needs a comment explaining why
 
 ### Adding a transport
 
-1. **Implement `RemoteTransport`** â€” a `name` and a `send(request): Promise<TransportResponse>`.
+1. **Implement `RemoteTransport`** — a `name` and a `send(request): Promise<TransportResponse>`.
 2. **Never read more than you need.** The request carries an already-serialised, already-sanitized
    `body`. Do not deserialise it to "fix it up"; that is a security boundary, not a convenience.
-3. **Throw to signal a retryable failure.** Return a `TransportResponse` â€” including for a `500`. An
+3. **Throw to signal a retryable failure.** Return a `TransportResponse` — including for a `500`. An
    HTTP error is not a transport error.
 4. **Parse `Retry-After` with `parseRetryAfter`** if your transport sees the header. It handles both
    the delta-seconds and HTTP-date forms and clamps to the ceiling.
@@ -519,7 +519,7 @@ These are errors, not warnings, and a suppression needs a comment explaining why
    Feature-detect per call, not at module scope.
 6. **Add it to `src/sync/`** if it is generic, or ship it as a separate package if it depends on a
    heavy SDK. A transport is the seam that keeps OTLP and Sentry envelopes from becoming hard
-   dependencies â€” do not break that.
+   dependencies — do not break that.
 
 ### Adding a document
 
@@ -529,7 +529,7 @@ These are errors, not warnings, and a suppression needs a comment explaining why
 3. **Add it to `llms.txt`** under `## Docs`, with a short description and an absolute GitHub URL.
 4. **Add the facts to `llms-full.txt`** if it is API, option, constant or wire-format material rather
    than prose.
-5. **Link it from `README.md`** â€” the `## Documentation` table at the bottom is the index.
+5. **Link it from `README.md`** — the `## Documentation` table at the bottom is the index.
 6. **Verify every claim against the source.** A table row with a wrong default is worse than a
    missing row, because it is trusted. Quote the values rather than recalling them, and cite the file
    they came from when a reader might reasonably doubt it.
@@ -537,8 +537,8 @@ These are errors, not warnings, and a suppression needs a comment explaining why
 ### Adding a decision
 
 If you make a structural choice with real alternatives, add an entry to `docs/DECISIONS.md` rather
-than a comment. Use the existing format â€” `Status`, `Context`, `Decision`, `Alternatives considered`,
-`Consequences` â€” and be specific about the alternative you rejected and why. The rejected options are
+than a comment. Use the existing format — `Status`, `Context`, `Decision`, `Alternatives considered`,
+`Consequences` — and be specific about the alternative you rejected and why. The rejected options are
 usually the most valuable part of an ADR, because they are what stops the same debate from happening
 twice.
 
@@ -549,15 +549,15 @@ If the decision is a breaking change to the persisted format or the public API, 
 
 ## Reporting bugs and requesting features
 
-- **A bug** â€” open an issue with the version, the environment (browser, bundler, SSR or not), the
+- **A bug** — open an issue with the version, the environment (browser, bundler, SSR or not), the
   resolved configuration (`getState().options`), the `onInternalError` output, and
   `getTelemetryStatus()`. That set of five resolves most reports without a round trip.
-- **A security issue** â€” do **not** open a public issue. Use the private advisory flow described in
+- **A security issue** — do **not** open a public issue. Use the private advisory flow described in
   [SECURITY.md](docs/SECURITY.md#11-disclosure-policy).
-- **A feature** â€” open an issue describing the problem before the solution. Several plausible
+- **A feature** — open an issue describing the problem before the solution. Several plausible
   features are explicitly and permanently out of scope (session replay, source maps, a server,
   alerting); check [README.md](README.md#roadmap--not-in-scope) first.
-- **A new runtime dependency** â€” open an issue rather than a pull request. Zero dependencies is a
+- **A new runtime dependency** — open an issue rather than a pull request. Zero dependencies is a
   headline property of the package, and a dependency needs a stronger argument than convenience.
 
 ## License

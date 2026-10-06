@@ -1,12 +1,12 @@
 # Security Policy
 
 `@codewithrajat/rm-logvault` runs inside other people's applications, on their users' machines, and it reads values
-that were never meant to be read â€” thrown errors, hostile objects, malformed storage rows. A defect
+that were never meant to be read — thrown errors, hostile objects, malformed storage rows. A defect
 here is a privacy incident in someone else's product, so security reports are treated as the highest
 priority in this repository.
 
-This file is the disclosure policy. The engineering detail â€” threat model, redaction design, the
-guarantees and their enforcement â€” lives in [docs/SECURITY.md](docs/SECURITY.md).
+This file is the disclosure policy. The engineering detail — threat model, redaction design, the
+guarantees and their enforcement — lives in [docs/SECURITY.md](docs/SECURITY.md).
 
 ---
 
@@ -28,7 +28,7 @@ make private contact. Do not put the vulnerability in the issue body.
 A useful report contains:
 
 - The affected version, and the commit if you have it.
-- The smallest input that demonstrates the problem â€” ideally a failing test against
+- The smallest input that demonstrates the problem — ideally a failing test against
   `sanitizeValue`, `sanitizeText`, `sanitizeUrl`, `normalizeError`, `renderDiagnosticsReport` or the
   storage layer.
 - The impact in one sentence: what leaks, to whom, and under what conditions.
@@ -58,9 +58,9 @@ Only the latest published version is supported. Security fixes are released as p
 
 | Version      | Supported                              |
 | ------------ | -------------------------------------- |
-| Latest `1.x` | âœ…                                     |
-| Older `1.x`  | âŒ â€” fixes are never backported        |
-| `< 1.0.0`    | âŒ â€” pre-1.0 releases are not maintained |
+| Latest `1.x` | ✅                                     |
+| Older `1.x`  | ❌ — fixes are never backported        |
+| `< 1.0.0`    | ❌ — pre-1.0 releases are not maintained |
 
 ---
 
@@ -128,7 +128,7 @@ For consumers evaluating the dependency:
 - **Continuous scanning.** `pnpm audit` and OSV run in CI, and the lockfile is committed.
 - **Dependency cooldown.** A version published less than seven days ago is never installed
   (`minimumReleaseAge`), so a compromised release is not merely detectable but unreachable.
-- **2FA-enforced publishing**, and framework peers are `optional` â€” installing `@codewithrajat/rm-logvault` never pulls
+- **2FA-enforced publishing**, and framework peers are `optional` — installing `@codewithrajat/rm-logvault` never pulls
   React, Vue, Angular, axios or TanStack Query.
 
 ---
@@ -139,5 +139,5 @@ If you are triaging a report, the relevant invariants are collected in
 [AGENTS.md](AGENTS.md#1-invariants-that-must-never-be-broken) and the enforcement points are listed in
 [docs/SECURITY.md](docs/SECURITY.md). A fix for a redaction or XSS finding **must** add a regression
 test to the seeded corpus in `src/errors/sanitize.test.ts` or
-`src/export/reportTemplate.test.ts` before it is merged â€” the corpus is the mechanism that stops the
+`src/export/reportTemplate.test.ts` before it is merged — the corpus is the mechanism that stops the
 same class of bug from returning.

@@ -41,20 +41,20 @@
 - Add a page-load drill-down to the diagnostics report.
   
   The report was two flat tables: errors by last-seen, logs by time. It carried every field needed to
-  answer "what happened during this page load" â€” errors nest `page.pageLoadId`, logs carry it at the
-  top level â€” but nothing joined them, and table rows were styled as clickable with no handler behind
+  answer "what happened during this page load" — errors nest `page.pageLoadId`, logs carry it at the
+  top level — but nothing joined them, and table rows were styled as clickable with no handler behind
   them.
   
   The viewer now derives a page-load model from the records already embedded (no payload field was
   added, so the embedded JSON is still `schemaVersion: 1`) and offers three ways in:
   
-  - **Page loads** â€” one row per load with its route, first event, span and error/log counts, ordered
+  - **Page loads** — one row per load with its route, first event, span and error/log counts, ordered
     newest-first. Selecting a row filters both the errors and the logs to that load; selecting it again
     clears the filter.
-  - **Grouping** â€” error rows collapse by fingerprint with occurrences summed, so one failure is one
+  - **Grouping** — error rows collapse by fingerprint with occurrences summed, so one failure is one
     row even when a `pending` and a claimed row exist for the same fingerprint.
-  - **Drill-down** â€” selecting an error shows its fields, stack and raw JSON alongside every log from
-    the same load, ordered by time, with the entries inside `[firstSeen âˆ’ 5 s, lastSeen + 5 s]`
+  - **Drill-down** — selecting an error shows its fields, stack and raw JSON alongside every log from
+    the same load, ordered by time, with the entries inside `[firstSeen − 5 s, lastSeen + 5 s]`
     highlighted.
   
   Two documentation defects are corrected in the same change: the README claimed records were "grouped
@@ -90,7 +90,7 @@
   `minimumReleaseAge` of 10080 minutes (a dependency version published less than seven days ago is
   never installed), `blockExoticSubdeps: true`, and an `allowBuilds` allow-list for dependency install
   scripts. As a consequence, ten `devDependency` ranges were lowered to the newest version that is at
-  least a week old â€” publishing a release with a newer minimum would fail `pnpm install` with
+  least a week old — publishing a release with a newer minimum would fail `pnpm install` with
   `ERR_PNPM_NO_MATURE_MATCHING_VERSION`. Contributors need Node >= 22.13 for the toolchain; the
   published package still runs on Node >= 18, which is unchanged.
 
@@ -142,13 +142,13 @@ dependencies; the core is 28.18 kB min+gzip, against a 30 kB regression budget.
 
 **Lifecycle and status**
 
-- `initTelemetry(options?)` â€” one-line bootstrap. Strictly idempotent (a second call returns the
+- `initTelemetry(options?)` — one-line bootstrap. Strictly idempotent (a second call returns the
   existing handle and installs nothing), never throws, and configurable for reconfiguration only via
   `destroyTelemetry()`.
-- `destroyTelemetry()` â€” removes every listener and timer synchronously, then flushes and closes both
+- `destroyTelemetry()` — removes every listener and timer synchronously, then flushes and closes both
   databases asynchronously. Idempotent and never throws.
 - `flushTelemetry()`, `syncTelemetry()`, `retryFailedTelemetry()`, `clearTelemetryData()`.
-- `getTelemetryStatus()` â€” a synchronous snapshot (`initialized`, `storage`, `online`, `pending`,
+- `getTelemetryStatus()` — a synchronous snapshot (`initialized`, `storage`, `online`, `pending`,
   `droppedByRateLimit`, `lastSync`, `syncStatus`).
 - `isTelemetryInitialized()`.
 - `TelemetryHandle` with `appName`, `pageLoadId`, `enabled`, `storage`, `destroy`, `flush` and `sync`.
@@ -158,7 +158,7 @@ dependencies; the core is 28.18 kB min+gzip, against a 30 kB regression budget.
 - `TelemetryOptions` with the `errors`, `logs`, `redaction`, `rest` and `shortcut` groups, plus
   `appName`, `appVersion`, `buildId`, `environment`, `enabled`, `dbPrefix`, `env`, `consent`,
   `onInternalError`, `repository` and `logSource`.
-- `resolveOptions(options?)` â€” resolves, validates and freezes a configuration. Explicit option beats
+- `resolveOptions(options?)` — resolves, validates and freezes a configuration. Explicit option beats
   the environment layer, which beats the built-in default. Non-positive or non-finite numerics and
   unrecognised level strings are ignored rather than applied.
 - `DEFAULT_OPTIONS` and `databaseNames(dbPrefix)`.
@@ -179,7 +179,7 @@ dependencies; the core is 28.18 kB min+gzip, against a 30 kB regression budget.
   and `getConfig`, plus `createLogger()` for an isolated controller.
 - A persist level (`logs.level`, default `'warn'`) independent of the console level
   (`logger.setLevel`), with sinks running before the console filter.
-- `captureConsole` â€” opt-in wrapping of `console.warn` and `console.error`, fully restored on
+- `captureConsole` — opt-in wrapping of `console.warn` and `console.error`, fully restored on
   teardown.
 - Pre-init log buffering (50 calls) replayed once the first sink arrives, so records carry real
   application metadata.
@@ -190,7 +190,7 @@ dependencies; the core is 28.18 kB min+gzip, against a 30 kB regression budget.
 
 **Error capture**
 
-- `captureError(error, ctx?)` â€” one ingestion point for every source. Accepts anything (including
+- `captureError(error, ctx?)` — one ingestion point for every source. Accepts anything (including
   `null`, a `Symbol`, a hostile Proxy and an `AggregateError`), never throws, and cannot recurse.
   Identity-based deduplication via a `WeakSet` so one `Error` reaching several paths produces one
   record.
@@ -198,21 +198,21 @@ dependencies; the core is 28.18 kB min+gzip, against a 30 kB regression budget.
   is retained, and replayed with full metadata after initialization.
 - `captureApiError(error, startedAt?)` and `captureFetchError(request, failure)` with an allow-list of
   request metadata only.
-- `withErrorCapture(handler, ctx?)` â€” captures and re-throws the original value.
+- `withErrorCapture(handler, ctx?)` — captures and re-throws the original value.
 - `markAuthError` / `isAuthError` for the auth failures a status code cannot express.
 - Fixed-window rate limiting (120 errors and 600 logs per minute by default) with a single summary
   line rather than one warning per dropped event.
 
 **Normalisation, classification and fingerprinting**
 
-- `normalizeError` â€” cross-realm-safe structural typing, `cause` chain extraction
+- `normalizeError` — cross-realm-safe structural typing, `cause` chain extraction
   (`MAX_CAUSE_DEPTH` 3), `AggregateError` flattening (5 sub-errors), chunk-error recognition, and a
   hard-coded fallback (`UNNORMALIZABLE`) so it can never throw.
 - `sanitizeNormalized` for re-scrubbing an already-normalised value.
 - `buildApiErrorContext` and `buildFetchErrorContext` with the documented kind resolution order
-  (`auth â†’ abort â†’ timeout â†’ parse â†’ http â†’ network â†’ unknown`), plus `categoryForKind`,
+  (`auth → abort → timeout → parse → http → network → unknown`), plus `categoryForKind`,
   `severityForKind` and `CORRELATION_HEADERS`.
-- `fingerprint` â€” a 28-hex-character `cyrb53`-based key computed from already-sanitized fields, so a
+- `fingerprint` — a 28-hex-character `cyrb53`-based key computed from already-sanitized fields, so a
   secret can never enter an index. `fingerprintParts`, `normalizePathForFingerprint` (numeric, UUID
   and long-hex segments collapse to `:id`), `topStackFrames` and `cyrb53`.
 
@@ -250,13 +250,13 @@ dependencies; the core is 28.18 kB min+gzip, against a 30 kB regression budget.
 
 **REST sync**
 
-- `createSyncManager` â€” claim, send, then delete-or-requeue, with one run at a time and a per-kind
+- `createSyncManager` — claim, send, then delete-or-requeue, with one run at a time and a per-kind
   batch loop.
-- `createFetchTransport` â€” the library's only network egress. Uses the platform `fetch`, never reads
+- `createFetchTransport` — the library's only network egress. Uses the platform `fetch`, never reads
   the response body, and never throws for an HTTP status.
 - Status classification: `2xx` accepted, `400/401/403/404/405/410/413/415/422` terminal
   (`uploadStatus: 'failed'`), everything else retryable with exponential backoff
-  (`min(15000 Â· 2^(n-1), 900000)` ms).
+  (`min(15000 · 2^(n-1), 900000)` ms).
 - `Retry-After` support in delta-seconds and HTTP-date form, clamped to `[0, 900000]` and never
   shortening the backoff.
 - Per-request header provider (`getHeaders`, awaited so tokens can be refreshed), a 10-second abort
@@ -299,24 +299,24 @@ dependencies; the core is 28.18 kB min+gzip, against a 30 kB regression budget.
 
 **Framework and HTTP adapters** (separate subpath entry points, framework peers optional)
 
-- `@codewithrajat/rm-logvault/react` â€” `TelemetryErrorBoundary`, `reactRootErrorHandlers` (React 19
+- `@codewithrajat/rm-logvault/react` — `TelemetryErrorBoundary`, `reactRootErrorHandlers` (React 19
   `onUncaughtError` / `onCaughtError` / `onRecoverableError`) and `useErrorCapture`.
-- `@codewithrajat/rm-logvault/vue` â€” `createTelemetryVuePlugin` and `attachVueTelemetry`, chaining any pre-existing
+- `@codewithrajat/rm-logvault/vue` — `createTelemetryVuePlugin` and `attachVueTelemetry`, chaining any pre-existing
   `errorHandler` and `warnHandler` rather than replacing them.
-- `@codewithrajat/rm-logvault/angular` â€” `TelemetryErrorHandler` and `provideTelemetryErrorHandler` using a
+- `@codewithrajat/rm-logvault/angular` — `TelemetryErrorHandler` and `provideTelemetryErrorHandler` using a
   `useFactory` provider so consumers need neither `experimentalDecorators` nor
   `emitDecoratorMetadata`; plus `getPreviousErrorHandler`.
-- `@codewithrajat/rm-logvault/axios` â€” `attachAxios`, a response interceptor that classifies, captures and re-throws the
+- `@codewithrajat/rm-logvault/axios` — `attachAxios`, a response interceptor that classifies, captures and re-throws the
   original rejection unchanged.
-- `@codewithrajat/rm-logvault/fetch` â€” `instrumentFetch`, an opt-in and fully reversible `fetch` wrapper that reads only
+- `@codewithrajat/rm-logvault/fetch` — `instrumentFetch`, an opt-in and fully reversible `fetch` wrapper that reads only
   the rejection reason and the response status, plus `registerTelemetryUrl` to keep the library's own
   uploads out of the capture path.
-- `@codewithrajat/rm-logvault/react-query` â€” `attachQueryClient`, chaining `QueryCache.config.onError` and
+- `@codewithrajat/rm-logvault/react-query` — `attachQueryClient`, chaining `QueryCache.config.onError` and
   `MutationCache.config.onError` and tagging records with the failing query or mutation key.
 
 **Testing utilities**
 
-- `@codewithrajat/rm-logvault/testing` â€” `createMemoryRepository(options?)` with `failWith` and `quotaAt` to exercise
+- `@codewithrajat/rm-logvault/testing` — `createMemoryRepository(options?)` with `failWith` and `quotaAt` to exercise
   degradation and quota recovery, mirroring the IndexedDB semantics exactly; and
   `createFakeTransport(options?)` with scriptable status, `Retry-After`, simulated network failures,
   and recorded request bodies.

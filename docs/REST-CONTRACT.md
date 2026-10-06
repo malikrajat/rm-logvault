@@ -25,16 +25,16 @@ and `src/sync/syncManager.ts`.
 | Credentials      | `rest.credentials`, default `'same-origin'`. Never implicitly `'include'`.                                                                     |
 | Redirects        | `'follow'`                                                                                                                                     |
 | Abort budget     | 10 000 ms (`REQUEST_TIMEOUT_MS`), enforced with `AbortController`                                                                              |
-| `keepalive`      | Only on the unload flush (`pagehide` / `visibilitychange â†’ hidden`), and only when the body is under 60 000 characters (`KEEPALIVE_MAX_BYTES`) |
+| `keepalive`      | Only on the unload flush (`pagehide` / `visibilitychange → hidden`), and only when the body is under 60 000 characters (`KEEPALIVE_MAX_BYTES`) |
 | Headers          | Whatever `rest.getHeaders()` returns, awaited **per request**, merged over `Content-Type`                                                      |
 | Endpoints        | One per kind: `rest.errorsUrl` and `rest.logsUrl`. Omit one and that kind stays local forever.                                                 |
 | Response reading | **The body is never read.** Only `response.status` and the `Retry-After` header.                                                               |
 
 Endpoint validation happens once, at initialization, through `resolveEndpoint(raw, requireHttps)`:
 
-- Empty or whitespace-only â†’ rejected.
+- Empty or whitespace-only → rejected.
 - A forbidden scheme (`javascript:`, `data:`, `vbscript:`, `file:`, `blob:`, `about:`, `chrome:`,
-  `chrome-extension:`) â†’ rejected.
+  `chrome-extension:`) → rejected.
 - A relative URL is resolved against `window.location.href`. Outside a browser there is no origin,
   so a relative URL is rejected.
 - Only `http:` and `https:` survive parsing.
@@ -204,7 +204,7 @@ answers "did anything survive?" without a request.
         },
         "fingerprint": {
           "type": "string",
-          "description": "28 lowercase hex characters, or an 'unfingerprinted-â€¦' token if hashing failed."
+          "description": "28 lowercase hex characters, or an 'unfingerprinted-…' token if hashing failed."
         },
         "uploadStatus": { "$ref": "#/$defs/uploadStatus" },
         "uploadAttempts": { "type": "integer", "minimum": 0 },
@@ -350,7 +350,7 @@ A few things the schema does **not** pin down, on purpose:
   2000 characters per string, 16 384 / 4096 bytes per record) but their _shape_ is application data.
 - Timestamps are plain integers. They come from `Date.now()` on the client, so clock skew is
   possible; treat them as advisory ordering, not as authoritative audit timestamps.
-- `uploadStatus` is included and is usually `"uploading"` â€” the row was claimed immediately before
+- `uploadStatus` is included and is usually `"uploading"` — the row was claimed immediately before
   sending. A server that stores the record verbatim and later re-serves it should be aware of the
   field rather than surprised by it.
 
@@ -449,7 +449,7 @@ batch exceeds the 256 KiB limit
 ```
 
 `413` is in `TERMINAL_STATUSES`, so those records are marked `failed` and stop consuming retry
-budget. The `onTerminalFailure` callback fires with `(413, [{ id: 'f47ac10b-â€¦' }])`.
+budget. The `onTerminalFailure` callback fires with `(413, [{ id: 'f47ac10b-…' }])`.
 
 ### A log batch
 
@@ -510,7 +510,7 @@ new Set([400, 401, 403, 404, 405, 410, 413, 415, 422]);
 | Status                                                                          | Outcome     | Records             | Notes                                                                                                                 |
 | ------------------------------------------------------------------------------- | ----------- | ------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `200` `201` `202` `204`                                                         | `ok`        | **Deleted** locally | The delete happens only after the 2xx. Respond `204` or `202` with an empty body if you have nothing to say.          |
-| `400 Bad Request`                                                               | `terminal`  | `failed`            | The batch is malformed. Fix the server or the schema â€” retrying sends the same bytes.                                 |
+| `400 Bad Request`                                                               | `terminal`  | `failed`            | The batch is malformed. Fix the server or the schema — retrying sends the same bytes.                                 |
 | `401 Unauthorized`                                                              | `terminal`  | `failed`            | Deliberately terminal so a batch stops consuming retry budget. Call `retryFailedTelemetry()` after re-authenticating. |
 | `403 Forbidden`                                                                 | `terminal`  | `failed`            |                                                                                                                       |
 | `404 Not Found`                                                                 | `terminal`  | `failed`            | The endpoint is probably wrong. Check `resolveEndpoint`.                                                              |
@@ -550,8 +550,8 @@ initTelemetry({
 
 ### Why a throwing `getHeaders` is retryable
 
-`rest.getHeaders()` is awaited per request so tokens can be refreshed. If it throws â€” the refresh
-call itself failed, the token store is unavailable â€” the batch goes back to `pending` and the run
+`rest.getHeaders()` is awaited per request so tokens can be refreshed. If it throws — the refresh
+call itself failed, the token store is unavailable — the batch goes back to `pending` and the run
 stops. That is explicitly **not** terminal, because the header provider is expected to succeed once
 the session is restored.
 
@@ -586,7 +586,7 @@ export function parseRetryAfter(value: string | null | undefined): number | unde
 | `999999`                           | `900000` (clamped to `BACKOFF_MAX_MS`)                    |
 | `Wed, 21 Oct 2026 07:28:00 GMT`    | milliseconds until that instant, clamped to `[0, 900000]` |
 | A date in the past                 | `0`                                                       |
-| `garbage`, ``, or a missing header | `undefined` â€” plain backoff applies                       |
+| `garbage`, ``, or a missing header | `undefined` — plain backoff applies                       |
 
 Semantics worth knowing:
 
@@ -609,14 +609,14 @@ Semantics worth knowing:
 
 logVault **deletes the local rows as soon as it sees a 2xx**. There is no follow-up confirmation,
 no receipt endpoint and no local copy afterwards. If the server responds `202 Accepted` and then
-loses the data â€” an in-memory queue that is dropped on restart, an un-awaited write, a rollback
-after the response was flushed â€” that data is gone from both sides.
+loses the data — an in-memory queue that is dropped on restart, an un-awaited write, a rollback
+after the response was flushed — that data is gone from both sides.
 
 The 2xx must therefore mean _"durably accepted"_, not _"received"_:
 
 ```text
-correct:   receive â†’ validate â†’ write to durable storage â†’ commit â†’ respond 202
-incorrect: receive â†’ validate â†’ respond 202 â†’ enqueue asynchronously
+correct:   receive → validate → write to durable storage → commit → respond 202
+incorrect: receive → validate → respond 202 → enqueue asynchronously
 ```
 
 If the write fails, respond `5xx` and logVault will retry with backoff. A `5xx` costs one retry; a
@@ -629,7 +629,7 @@ Delivery is **at least once**, by construction:
 1. `claimPending` marks rows `uploading`.
 2. The request is sent.
 3. The server commits.
-4. The response is lost â€” connection reset, proxy timeout, a `pagehide` racing the socket, the user
+4. The response is lost — connection reset, proxy timeout, a `pagehide` racing the socket, the user
    closing the tab.
 5. The transport rejects or the status is unreadable, so the rows go back to `pending`.
 6. The next run sends them again.
@@ -665,13 +665,13 @@ ON CONFLICT (id) DO NOTHING;
 
 An alternative worth considering: `ON CONFLICT (id) DO UPDATE` when the incoming
 `occurrenceCount` is higher. An error record that was retried after further aggregation merges
-locally can legitimately carry a larger count than the copy the server already has â€” but note that
+locally can legitimately carry a larger count than the copy the server already has — but note that
 aggregation only ever touches `pending` rows, so a row that has been claimed for upload is frozen.
 Two deliveries of the same `id` therefore carry identical payloads in practice, and `DO NOTHING` is
 sufficient.
 
-Do **not** use `fingerprint` as the idempotency key. Different records can share a fingerprint â€”
-that is the point of a fingerprint â€” and error aggregation is a client concern.
+Do **not** use `fingerprint` as the idempotency key. Different records can share a fingerprint —
+that is the point of a fingerprint — and error aggregation is a client concern.
 
 ### 6.4 Respond quickly
 
@@ -701,7 +701,7 @@ Notes:
   `Access-Control-Allow-Headers`.
 - `rest.credentials` defaults to `'same-origin'`, which means no cookies go cross-origin and
   `Access-Control-Allow-Origin` does **not** need `Access-Control-Allow-Credentials` unless you
-  explicitly set `credentials: 'include'`. If you do, `*` is illegal â€” the origin must be echoed.
+  explicitly set `credentials: 'include'`. If you do, `*` is illegal — the origin must be echoed.
 - Exposing `Retry-After` requires `Access-Control-Expose-Headers: Retry-After`. Without it the
   header is invisible to JavaScript and the client falls back to plain exponential backoff, which
   still works but ignores your hint.
@@ -711,7 +711,7 @@ Notes:
 ## 7. Minimal server implementations
 
 Both examples parse the envelope, validate it, write it durably with an idempotent upsert, and only
-then respond â€” the order matters.
+then respond — the order matters.
 
 ### Express
 
@@ -814,7 +814,7 @@ export { app };
 
 Two details in that example are load-bearing. The commit happens **before** the response, so a
 `202` cannot be a lie. And the preflight is handled by `express.json()` plus CORS middleware placed
-before the routes (not shown, to keep the example focused) â€” without it the browser never sends the
+before the routes (not shown, to keep the example focused) — without it the browser never sends the
 `POST`.
 
 ### Fastify
@@ -931,7 +931,7 @@ export { app };
 
 Fastify's default `400` for a schema violation is exactly the outcome logVault wants: it is in
 `TERMINAL_STATUSES`, so the records are marked `failed` and stop being resent. Contrast that with
-the Express example, which deliberately uses `422` for the same purpose â€” both are terminal, and
+the Express example, which deliberately uses `422` for the same purpose — both are terminal, and
 either is fine.
 
 ---
@@ -942,26 +942,26 @@ For a server engineer debugging an integration, this is what the client does wit
 
 ```text
 POST /telemetry/errors
-  â”‚
-  â”œâ”€ transport threw (network, abort, timeout, no fetch)
-  â”‚     â†’ requeue ids to 'pending'
-  â”‚     â†’ failures += 1
-  â”‚     â†’ schedule(max(backoffDelay(failures), retryAfterMs))
-  â”‚
-  â””â”€ transport resolved with a status
-        â”œâ”€ 2xx  â†’ delete ids
-        â”‚         failures = 0, lastSync = now, schedule(rest.intervalMs)
-        â”‚
-        â”œâ”€ 400|401|403|404|405|410|413|415|422
-        â”‚     â†’ mark ids 'failed'
-        â”‚     â†’ rest.onTerminalFailure(status, ids)
-        â”‚     â†’ failures += 1, status = 'error'
-        â”‚     â†’ schedule(backoffDelay(failures))
-        â”‚
-        â””â”€ anything else
-              â†’ requeue ids to 'pending'
-              â†’ failures += 1, status = 'retry'
-              â†’ schedule(max(backoffDelay(failures), retryAfterMs))
+  │
+  ├─ transport threw (network, abort, timeout, no fetch)
+  │     → requeue ids to 'pending'
+  │     → failures += 1
+  │     → schedule(max(backoffDelay(failures), retryAfterMs))
+  │
+  └─ transport resolved with a status
+        ├─ 2xx  → delete ids
+        │         failures = 0, lastSync = now, schedule(rest.intervalMs)
+        │
+        ├─ 400|401|403|404|405|410|413|415|422
+        │     → mark ids 'failed'
+        │     → rest.onTerminalFailure(status, ids)
+        │     → failures += 1, status = 'error'
+        │     → schedule(backoffDelay(failures))
+        │
+        └─ anything else
+              → requeue ids to 'pending'
+              → failures += 1, status = 'retry'
+              → schedule(max(backoffDelay(failures), retryAfterMs))
 ```
 
 At most 10 batches are attempted per run (`MAX_BATCHES_PER_FLUSH`) and both kinds are interleaved,
@@ -976,8 +976,8 @@ left to claim, or the browser reports itself offline.
 | ---------------------------------- | ---------------------------------------------------------------------------- |
 | Delivery semantics                 | At least once                                                                |
 | Idempotency key                    | Record `id`                                                                  |
-| Duplicate tolerance required       | Yes â€” assume it                                                              |
-| Durable accept before 2xx required | Yes â€” the client deletes on 2xx                                              |
+| Duplicate tolerance required       | Yes — assume it                                                              |
+| Durable accept before 2xx required | Yes — the client deletes on 2xx                                              |
 | Response body read                 | Never                                                                        |
 | Success statuses                   | Any `2xx`                                                                    |
 | Terminal statuses                  | `400, 401, 403, 404, 405, 410, 413, 415, 422`                                |

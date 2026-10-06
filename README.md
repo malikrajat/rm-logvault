@@ -21,14 +21,14 @@
 
 <div align="center">
 
-  <img src="https://raw.githubusercontent.com/malikrajat/rm-logvault/main/assets/demo.gif" alt="rm-logvault: an uncaught error is captured, then exported as one diagnostics report" width="800"/>
+  <img src="https://github.com/malikrajat/rm-logvault/blob/main/assets/demo.gif" alt="rm-logvault: an uncaught error is captured, then exported as one diagnostics report" width="800"/>
 
 </div>
 
 ---
 
 <p align="center">
-<strong>The offline-first error tracker, logger and diagnostics exporter for the browser. It records every error and log into IndexedDB, redacts secrets before writing anything, and hands you one self-contained HTML report Ã¢â‚¬â€ no server, no account, no dependencies. Framework-agnostic by construction, with optional React, Vue, Angular, axios and TanStack Query adapters.</strong>
+<strong>The offline-first error tracker, logger and diagnostics exporter for the browser. It records every error and log into IndexedDB, redacts secrets before writing anything, and hands you one self-contained HTML report — no server, no account, no dependencies. Framework-agnostic by construction, with optional React, Vue, Angular, axios and TanStack Query adapters.</strong>
 </p>
 
 ---
@@ -88,7 +88,7 @@
       </a>
       <br/><br/>
       <sub><b>Interactive Playground</b></sub><br/>
-      <sub>Run it live in your browser Ã¢â‚¬â€ no install</sub>
+      <sub>Run it live in your browser — no install</sub>
     </td>
     <td align="center" width="50%">
       <a href="https://github.com/malikrajat/rm-logvault/blob/main/docs/README.md" target="_blank">
@@ -145,9 +145,9 @@
 
 RM LogVault is built for developers searching for a browser error tracker, an offline-first logging library, a client-side diagnostics exporter, or an IndexedDB-backed "black box" they can ship without a collector, an account or a runtime dependency.
 
-- **Catches every error your app throws** Ã¢â‚¬â€ even the ones you never wrapped in a `try`/`catch`, and the ones thrown inside a promise nobody awaited.
-- **Keeps a copy on the device**, inside the browser's built-in database (IndexedDB Ã¢â‚¬â€ it ships with the browser, you install nothing), so the evidence survives a page reload.
-- **Lets you write logs with levels** Ã¢â‚¬â€ `logger.info(...)`, `logger.warn(...)`, `logger.error(...)` Ã¢â‚¬â€ and you decide which of them are worth keeping.
+- **Catches every error your app throws** — even the ones you never wrapped in a `try`/`catch`, and the ones thrown inside a promise nobody awaited.
+- **Keeps a copy on the device**, inside the browser's built-in database (IndexedDB — it ships with the browser, you install nothing), so the evidence survives a page reload.
+- **Lets you write logs with levels** — `logger.info(...)`, `logger.warn(...)`, `logger.error(...)` — and you decide which of them are worth keeping.
 - **Turns all of it into one file** a user can send you: press `Ctrl+Shift+Alt+D` and a self-contained HTML report downloads.
 - **Deletes secrets before it writes anything.** Tokens, passwords, e-mail addresses and full query strings are replaced with `[REDACTED]` by default, with no setup.
 - **Installs global handlers, and chains yours.** `window.onerror` is captured rather than overwritten, and your handler still runs and still controls whether the default console message is suppressed.
@@ -157,14 +157,14 @@ RM LogVault is built for developers searching for a browser error tracker, an of
 - **Rate-limits by default**, at 120 errors and 600 logs per minute, and reports a single summary line when it drops the excess rather than one warning per event.
 - **Offline-first, never lossy**: records are written to IndexedDB first and uploaded second, so an endpoint that is down, a user on a plane or a mid-deploy server never loses evidence.
 - **Uploads on your terms.** Point `rest.errorsUrl` at your own endpoint and it handles batching, exponential backoff, `Retry-After`, stale-claim recovery and at-least-once delivery keyed on a stable `id`.
-- **Extensible redaction.** Add your own sensitive key names and free-text patterns (`sk_live_Ã¢â‚¬Â¦`, tenant headers) on top of the built-ins, and allow-list the query values that are safe to keep.
+- **Extensible redaction.** Add your own sensitive key names and free-text patterns (`sk_live_…`, tenant headers) on top of the built-ins, and allow-list the query values that are safe to keep.
 - **Callbacks for your own logic.** `beforeCapture` and `beforeStore` let you inspect, change or drop a record; `onTerminalFailure` tells you a batch was rejected for good so you can re-authenticate and requeue it.
 - **Swappable storage and transport.** The repository and the transport are both injectable, so you can store somewhere else, send over your own client, or encrypt records before they land in IndexedDB.
-- **`@codewithrajat/rm-logvault/testing` for your test suite** Ã¢â‚¬â€ an in-memory repository that mirrors real IndexedDB semantics and a fake transport that scripts every upload branch, with no browser and no fake IndexedDB.
+- **`@codewithrajat/rm-logvault/testing` for your test suite** — an in-memory repository that mirrors real IndexedDB semantics and a fake transport that scripts every upload branch, with no browser and no fake IndexedDB.
 - **Zero runtime dependencies and tree-shakeable**: framework packages are optional peers, and importing `captureError` alone costs roughly a quarter of the full recorder.
 - **Framework-agnostic core**: React, Vue, Angular, axios and TanStack Query adapters are thin, optional subpaths, so a Vue app never ships React code.
 - **SSR-safe and microfrontend-safe**: no module-level code touches a browser global, and process-wide state lives on `globalThis` so two bundled copies share one instance instead of double-capturing.
-- **Written in TypeScript** with the strictest settings, shipping its own type declarations for every subpath Ã¢â‚¬â€ no `@types` package needed.
+- **Written in TypeScript** with the strictest settings, shipping its own type declarations for every subpath — no `@types` package needed.
 
 ## Quick Start
 
@@ -174,16 +174,16 @@ npm i @codewithrajat/rm-logvault
 ```
 
 ```ts
-// src/main.ts Ã¢â‚¬â€ the first module your app runs
+// src/main.ts — the first module your app runs
 import { initTelemetry } from '@codewithrajat/rm-logvault';
 
 initTelemetry({ appName: 'my-app' });
 ```
 
 Three lines: an import, a blank line, and one call. `initTelemetry` is the function that starts the
-recorder Ã¢â‚¬â€ it is the only piece of jargon on this page you have to type.
+recorder — it is the only piece of jargon on this page you have to type.
 
-### That's it Ã¢â‚¬â€ what you just got
+### That's it — what you just got
 
 With those three lines, and nothing else configured:
 
@@ -192,7 +192,7 @@ With those three lines, and nothing else configured:
 - Failed dynamic imports and chunk loads (the error you see when a user has a stale tab open during
   a deploy).
 - Every `logger.warn(...)` and `logger.error(...)` call, saved to the browser database.
-  (`logger.info` and below are printed but not saved Ã¢â‚¬â€ you can change that, see
+  (`logger.info` and below are printed but not saved — you can change that, see
   [Logging](#logging).)
 - A hidden `Ctrl+Shift+Alt+D` shortcut that downloads one HTML report.
 - Redaction applied before anything is written to disk.
@@ -203,17 +203,17 @@ With those three lines, and nothing else configured:
 Do this once. It takes about thirty seconds and it is the fastest way to trust the thing.
 
 > **In a hurry, or no project to hand?** Open the
-> [StackBlitz playground](https://stackblitz.com/edit/stackblitz-starters-p7w7kwau) Ã¢â‚¬â€ the library is
+> [StackBlitz playground](https://stackblitz.com/edit/stackblitz-starters-p7w7kwau) — the library is
 > already installed and initialised there, so you can go straight to step 2.
 
 1. Run your app and open it in a browser. Open DevTools (`F12`, or `Cmd`+`Option`+`I` on macOS) and
    click the **Console** tab.
 
-2. Click once on the page background Ã¢â‚¬â€ **not** inside a text field Ã¢â‚¬â€ then type this and press
+2. Click once on the page background — **not** inside a text field — then type this and press
    Enter:
 
    ```js
-   // typed into the DevTools console Ã¢â‚¬â€ not a file
+   // typed into the DevTools console — not a file
    throw new Error('my first logVault record');
    ```
 
@@ -272,7 +272,7 @@ That is the entire install. Nothing else is pulled in, and no install script run
 ### CDN (no bundler, no npm)
 
 ```html
-<!-- index.html Ã¢â‚¬â€ put this near the end of <body> -->
+<!-- index.html — put this near the end of <body> -->
 <script type="module">
   import { initTelemetry, logger } from 'https://esm.sh/@codewithrajat/rm-logvault@1.0.0';
 
@@ -300,7 +300,7 @@ first line of each says where the file goes.
 Use this when there is no build step at all.
 
 ```html
-<!-- index.html Ã¢â‚¬â€ the single page you already have -->
+<!-- index.html — the single page you already have -->
 <script type="module">
   import { initTelemetry } from 'https://esm.sh/@codewithrajat/rm-logvault@1.0.0';
 
@@ -311,7 +311,7 @@ Use this when there is no build step at all.
 #### Vite + vanilla TypeScript
 
 ```ts
-// src/main.ts Ã¢â‚¬â€ the entry file that index.html loads
+// src/main.ts — the entry file that index.html loads
 import { initTelemetry } from '@codewithrajat/rm-logvault';
 
 initTelemetry({ appName: 'my-app' });
@@ -324,7 +324,7 @@ The same snippet works for webpack, Rollup, Parcel or esbuild projects: it is pl
 React 19 reports errors at the root, so hand it logVault's handlers.
 
 ```tsx
-// src/main.tsx Ã¢â‚¬â€ the file that calls createRoot
+// src/main.tsx — the file that calls createRoot
 import { createRoot } from 'react-dom/client';
 import { initTelemetry } from '@codewithrajat/rm-logvault';
 import { reactRootErrorHandlers } from '@codewithrajat/rm-logvault/react';
@@ -338,11 +338,11 @@ createRoot(document.getElementById('root')!, reactRootErrorHandlers()).render(<A
 
 #### React error boundary
 
-A boundary catches render errors in the subtree it wraps Ã¢â‚¬â€ and lets you show a fallback instead of a
+A boundary catches render errors in the subtree it wraps — and lets you show a fallback instead of a
 blank page.
 
 ```tsx
-// src/App.tsx Ã¢â‚¬â€ wrap the part of the tree you want to protect
+// src/App.tsx — wrap the part of the tree you want to protect
 import { TelemetryErrorBoundary } from '@codewithrajat/rm-logvault/react';
 
 export function App() {
@@ -363,7 +363,7 @@ record, because identical error objects are de-duplicated.
 what tells Next.js to run this file in the browser, so the call must live in a client component.
 
 ```tsx
-// app/providers.tsx Ã¢â‚¬â€ a client component
+// app/providers.tsx — a client component
 'use client';
 
 import { useEffect } from 'react';
@@ -384,7 +384,7 @@ React's Strict Mode double-invocation from leaving a second installation behind.
 #### Vue 3
 
 ```ts
-// src/main.ts Ã¢â‚¬â€ the Vue entry file
+// src/main.ts — the Vue entry file
 import { createApp } from 'vue';
 import { initTelemetry } from '@codewithrajat/rm-logvault';
 import { createTelemetryVuePlugin } from '@codewithrajat/rm-logvault/vue';
@@ -400,7 +400,7 @@ still runs.
 #### Angular
 
 ```ts
-// src/main.ts Ã¢â‚¬â€ the file that bootstraps AppComponent
+// src/main.ts — the file that bootstraps AppComponent
 import { bootstrapApplication } from '@angular/platform-browser';
 import { initTelemetry } from '@codewithrajat/rm-logvault';
 import { provideTelemetryErrorHandler } from '@codewithrajat/rm-logvault/angular';
@@ -416,7 +416,7 @@ Svelte has no framework-level error hook, so the global handlers do the work and
 your own error paths. There is no `@codewithrajat/rm-logvault/svelte` subpath.
 
 ```ts
-// src/main.ts Ã¢â‚¬â€ the Svelte entry file
+// src/main.ts — the Svelte entry file
 import { initTelemetry, captureError } from '@codewithrajat/rm-logvault';
 
 initTelemetry({ appName: 'my-app' });
@@ -437,7 +437,7 @@ Importing logVault on the server is safe: no module-level code touches `window`,
 `indexedDB`, and every accessor checks for them when called.
 
 But there is nothing useful to do there. `initTelemetry` on the server installs no listeners and
-finds no database, so nothing is persisted. Call it from browser code only Ã¢â‚¬â€ in Next.js, from a
+finds no database, so nothing is persisted. Call it from browser code only — in Next.js, from a
 `'use client'` component as shown above.
 
 ### Using it day to day
@@ -475,7 +475,7 @@ Someone writes this, sees nothing saved, and files a bug:
 import { initTelemetry, logger } from '@codewithrajat/rm-logvault';
 
 initTelemetry({ appName: 'my-app' });
-logger.setLevel('debug'); // Ã¢â€ Â this only makes the CONSOLE noisier
+logger.setLevel('debug'); // ← this only makes the CONSOLE noisier
 
 logger.info('[Checkout] cart loaded'); // printed to the console, NOT saved
 ```
@@ -490,16 +490,16 @@ initTelemetry({ appName: 'my-app', logs: { level: 'info' } });
 ```
 
 The two are independent on purpose. Leaving `logger.setLevel('off')` in production silences console
-noise while persistence keeps working Ã¢â‚¬â€ exactly what you want where nobody is watching the console:
+noise while persistence keeps working — exactly what you want where nobody is watching the console:
 
 ```ts
-// src/main.ts Ã¢â‚¬â€ production setting
+// src/main.ts — production setting
 import { initTelemetry, logger } from '@codewithrajat/rm-logvault';
 
 initTelemetry({ appName: 'my-app', logs: { level: 'warn' } });
 
-logger.setLevel('off'); // console is silentÃ¢â‚¬Â¦
-logger.warn('[Checkout] still saved'); // Ã¢â‚¬Â¦but the record IS written
+logger.setLevel('off'); // console is silent…
+logger.warn('[Checkout] still saved'); // …but the record IS written
 ```
 
 ##### Already have `console.warn` calls?
@@ -551,7 +551,7 @@ try {
 }
 ```
 
-`captureError` accepts literally anything you can throw Ã¢â‚¬â€ a string, `null`, a hostile object, an
+`captureError` accepts literally anything you can throw — a string, `null`, a hostile object, an
 `AggregateError`, an object with a circular `cause` chain. It never throws, so it is safe inside a
 `catch` block with no extra guarding.
 
@@ -575,8 +575,8 @@ Every recorded error carries a `source` field saying where it came from. This is
 | `window`             | `window.onerror`                                                | yes                                  |
 | `unhandledrejection` | The `unhandledrejection` listener                               | yes                                  |
 | `chunk`              | Failed dynamic import / `ChunkLoadError` / Vite preload error   | yes                                  |
-| `resource`           | A failed `<script>`, `<link>` or `<img>` load                   | no Ã¢â‚¬â€ `errors.captureResources: true` |
-| `csp`                | A `securitypolicyviolation` event                               | no Ã¢â‚¬â€ `errors.captureCsp: true`       |
+| `resource`           | A failed `<script>`, `<link>` or `<img>` load                   | no — `errors.captureResources: true` |
+| `csp`                | A `securitypolicyviolation` event                               | no — `errors.captureCsp: true`       |
 | `worker`             | Errors in a Worker or `self` scope                              | yes (same global handlers)           |
 | `api`                | `captureApiError`, `captureFetchError`, the axios/fetch adapters | only if you call them                |
 | `event-handler`      | `withErrorCapture`                                              | only if you call it                  |
@@ -585,11 +585,11 @@ Every recorded error carries a `source` field saying where it came from. This is
 | `angular`            | The Angular error handler                                       | only with `@codewithrajat/rm-logvault/angular`         |
 | `query`              | The TanStack Query adapter                                      | only with `@codewithrajat/rm-logvault/react-query`     |
 | `svelte`             | Your own `captureError` calls                                   | only if you call it                  |
-| `storage`            | Reserved for storage-originated failures                        | Ã¢â‚¬â€                                    |
-| `manual`             | `captureError(err)` with no `source` Ã¢â‚¬â€ the default              | only if you call it                  |
+| `storage`            | Reserved for storage-originated failures                        | —                                    |
+| `manual`             | `captureError(err)` with no `source` — the default              | only if you call it                  |
 
-An error recorded from a global source Ã¢â‚¬â€ `window`, `unhandledrejection`, `resource`, `chunk`, `csp`
-or `worker` Ã¢â‚¬â€ is marked `handled: false`, which is how you tell "the user hit this and nothing caught
+An error recorded from a global source — `window`, `unhandledrejection`, `resource`, `chunk`, `csp`
+or `worker` — is marked `handled: false`, which is how you tell "the user hit this and nothing caught
 it" apart from "the app caught this on purpose".
 
 logVault never replaces a handler you already installed. A `window.onerror` you wrote is chained: it
@@ -598,7 +598,7 @@ console message still stands.
 
 #### Where the data lives
 
-Everything is in two IndexedDB databases Ã¢â‚¬â€ the database built into your browser, which needs no
+Everything is in two IndexedDB databases — the database built into your browser, which needs no
 install and no server.
 
 | Database          | Object store | What is in it                                                          |
@@ -620,7 +620,7 @@ The `rm-logvault` part comes from the `dbPrefix` option; change it and both name
 You can also read them from the console:
 
 ```js
-// typed into the DevTools console Ã¢â‚¬â€ not a file
+// typed into the DevTools console — not a file
 const db = await new Promise((r) => { const q = indexedDB.open('rm-logvault-errors'); q.onsuccess = () => r(q.result); });
 const all = await new Promise((r) => { const q = db.transaction('errors').objectStore('errors').getAll(); q.onsuccess = () => r(q.result); });
 console.table(all.map((e) => ({ source: e.source, name: e.name, message: e.message, count: e.occurrenceCount })));
@@ -637,13 +637,13 @@ saved log. Tell the user to press the keys and attach the file. That is the whol
 
 The report is a viewer, not a dump. It groups errors by fingerprint, lists every page load with its
 route, time span and record counts, and lets you drill in: pick a load to filter both tables down to
-it, or select an error to see its stack, the logs recorded in the same load Ã¢â‚¬â€ with the ones inside the
-error's own time window highlighted Ã¢â‚¬â€ and a link to every other error from that same load. Errors and
+it, or select an error to see its stack, the logs recorded in the same load — with the ones inside the
+error's own time window highlighted — and a link to every other error from that same load. Errors and
 logs are joined on `pageLoadId`, which is what lets the report answer "what happened during this load"
 rather than only "what went wrong somewhere".
 
 **What the file contains, precisely.** Both IndexedDB databases in full: every error record and every
-log record, **whatever its `uploadStatus`** Ã¢â‚¬â€ `pending`, `uploading`, `uploaded` and `failed` alike, so
+log record, **whatever its `uploadStatus`** — `pending`, `uploading`, `uploaded` and `failed` alike, so
 nothing stuck in a queue is missing. Records are already redacted; pass `redactAgain: true` for a
 documented second pass. The file is named `diagnostics-report-<ISO timestamp>.html` unless you set
 `filenamePrefix`.
@@ -651,7 +651,7 @@ documented second pass. The file is named `diagnostics-report-<ISO timestamp>.ht
 **Where the shortcut does *not* exist.** It is a keyboard listener, so:
 
 - **A phone or tablet has no keyboard** and never emits `keydown`. The shortcut is not a mobile
-  support workflow Ã¢â‚¬â€ call `exportDiagnosticsReport()` from a button instead. This is the usual reason a
+  support workflow — call `exportDiagnosticsReport()` from a button instead. This is the usual reason a
   report can be produced on a developer's laptop but not on the customer's device.
 - Nothing is installed when there is no `document` (SSR, a prerender pass, a Web Worker), when you pass
   `shortcut: false`, or before `initTelemetry` runs.
@@ -663,8 +663,8 @@ captured: `'ready'` means genuinely no records, `'unavailable'` means the browse
 the export still wrote a file with zero rows. See
 [docs/BROWSER-SUPPORT.md](docs/BROWSER-SUPPORT.md).
 
-For the full gate-by-gate order Ã¢â‚¬â€ and a flowchart of exactly which branch a given keypress takes Ã¢â‚¬â€ see
-[ARCHITECTURE.md Ã‚Â§12](docs/ARCHITECTURE.md#12-the-diagnostics-export-path).
+For the full gate-by-gate order — and a flowchart of exactly which branch a given keypress takes — see
+[ARCHITECTURE.md §12](docs/ARCHITECTURE.md#12-the-diagnostics-export-path).
 
 **Change the keys.** Useful when the default clashes with something, or when you want to gate the
 shortcut to internal staff.
@@ -704,7 +704,7 @@ It reads every record regardless of upload status, so nothing stuck in a queue i
 report. It returns `false` instead of throwing when telemetry is disabled or not initialized, when it
 runs outside a browser, when an export is already running, or when the download itself cannot start.
 When storage is *unavailable* it still produces the file, with no records in it, and reports
-`diagnostics-read-errors` through `onInternalError` Ã¢â‚¬â€ check `getTelemetryStatus().storage` before
+`diagnostics-read-errors` through `onInternalError` — check `getTelemetryStatus().storage` before
 concluding that nothing was captured. See [docs/BROWSER-SUPPORT.md](docs/BROWSER-SUPPORT.md#5-verifying-on-your-own-machine).
 
 #### Privacy
@@ -715,16 +715,16 @@ version:
 **Removed by default, with no configuration:**
 
 - Anything whose *key* looks sensitive: `authorization`, `cookie`, `token`, `password`, `secret`,
-  `apiKey`, `session`, `email`, `phone` and similar Ã¢â‚¬â€ in any casing or separator style, so
+  `apiKey`, `session`, `email`, `phone` and similar — in any casing or separator style, so
   `access_token`, `accessToken` and `ACCESS TOKEN` all match.
 - JSON Web Tokens, anywhere they appear.
-- `Bearer Ã¢â‚¬Â¦`, `Basic Ã¢â‚¬Â¦` and `Token Ã¢â‚¬Â¦` authorization values.
+- `Bearer …`, `Basic …` and `Token …` authorization values.
 - `key=value` pairs for the obvious names: `token=`, `password=`, `api_key=`, `session=`, `email=`,
   `phone=`, and the rest.
-- Long opaque strings that look like credentials (a 32Ã¢â‚¬â€œ200 character run of word characters with no
+- Long opaque strings that look like credentials (a 32–200 character run of word characters with no
   surrounding context).
 - E-mail addresses.
-- Credentials embedded in URLs (`https://user:pass@host/Ã¢â‚¬Â¦` becomes `https://host/Ã¢â‚¬Â¦`).
+- Credentials embedded in URLs (`https://user:pass@host/…` becomes `https://host/…`).
 - URL fragments, and every query-string **value** except an allow-list (`page`, `limit`, `sort`,
   `lang` and a few more).
 - Cache-busting query strings inside stack traces, so `/src/App.tsx?t=1712345:12:3` groups with
@@ -743,7 +743,7 @@ The placeholder is always the literal text `[REDACTED]`.
 - Arbitrary headers. Nothing is enumerated; specific names are looked up, nothing more.
 
 **The one honest limitation.** A bare, short secret written in prose is not detectable.
-`sanitizeText('failed with hunter2')` returns `'failed with hunter2'` Ã¢â‚¬â€ a seven-character word is
+`sanitizeText('failed with hunter2')` returns `'failed with hunter2'` — a seven-character word is
 indistinguishable from ordinary English, and no pattern can catch it without redacting your whole
 message. If you know the shape of a secret you might log, add a pattern:
 
@@ -807,7 +807,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ### How do I capture unhandled promise rejections?
 
-Nothing to do Ã¢â‚¬â€ they are captured already. `initTelemetry` installs an `unhandledrejection` listener,
+Nothing to do — they are captured already. `initTelemetry` installs an `unhandledrejection` listener,
 and the record carries `source: 'unhandledrejection'` with `handled: false`.
 
 If you also want to suppress the browser's default console message, opt in:
@@ -836,8 +836,8 @@ initTelemetry({
 });
 ```
 
-Writes are batched Ã¢â‚¬â€ one database transaction per 50 entries, with a 1-second timer as the upper
-bound on how long a record can sit in memory Ã¢â‚¬â€ and flushed when the page is hidden or unloaded.
+Writes are batched — one database transaction per 50 entries, with a 1-second timer as the upper
+bound on how long a record can sit in memory — and flushed when the page is hidden or unloaded.
 
 ### How do I export logs from the browser without a backend?
 
@@ -899,7 +899,7 @@ picked up by whichever tab opens next. Nothing is lost.
 
 `errors.captureChunkErrors` is `true` by default. Dynamic-import failures, `ChunkLoadError`,
 `Failed to load module script`, Vite's preload-error event and failed `<script>` loads all become
-`source: 'chunk'`, `category: 'chunk'`, `severity: 'fatal'` Ã¢â‚¬â€ which turns "this user had a stale tab
+`source: 'chunk'`, `category: 'chunk'`, `severity: 'fatal'` — which turns "this user had a stale tab
 open during a deploy" into a single filter in the report. Add `errors.captureResources: true` to also
 catch the resource-load form.
 
@@ -916,13 +916,13 @@ This adds a `securitypolicyviolation` listener. Records use `source: 'csp'`, sev
 carry the directive that fired plus the blocked URI.
 
 Remember that a Content Security Policy (the response header that restricts what a page may load or
-connect to) can also block your *uploads* Ã¢â‚¬â€ the endpoint origin must be in `connect-src`. See
+connect to) can also block your *uploads* — the endpoint origin must be in `connect-src`. See
 [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
 ### How do I capture axios errors?
 
 ```ts
-// src/api/client.ts Ã¢â‚¬â€ wherever you create your axios instance
+// src/api/client.ts — wherever you create your axios instance
 import axios from 'axios';
 import { attachAxios } from '@codewithrajat/rm-logvault/axios';
 
@@ -932,7 +932,7 @@ const detach = attachAxios(api);
 
 The interceptor classifies the failure, captures it, and returns your original rejection
 **unchanged**. It reads only method, URL, status, statusText, code, timeout, duration and the first
-correlation header Ã¢â‚¬â€ never a request or response body.
+correlation header — never a request or response body.
 
 If you post telemetry with axios itself, tell the adapter to ignore your own endpoint:
 
@@ -945,7 +945,7 @@ registerTelemetryUrl('/api/telemetry/errors');
 
 ### How do I capture React error boundary errors?
 
-Use the boundary, the React 19 root handlers, or both Ã¢â‚¬â€ a failure reaching both is still one record.
+Use the boundary, the React 19 root handlers, or both — a failure reaching both is still one record.
 
 ```tsx
 // src/main.tsx
@@ -982,11 +982,11 @@ with its level and route.
 
 ### Does it slow down my app?
 
-No measurable amount, by design. Capture is synchronous and never waits on the database Ã¢â‚¬â€ persistence
+No measurable amount, by design. Capture is synchronous and never waits on the database — persistence
 is queued in the background. Log writes are batched. Records are bounded by depth, key, array and
 length limits, and a rate limiter drops excess (120 errors and 600 logs per minute by default),
-reporting one summary line instead of one warning per dropped event. The expensive work Ã¢â‚¬â€
-sanitising a deep object, trimming an oversized payload, building a report Ã¢â‚¬â€ happens once per record
+reporting one summary line instead of one warning per dropped event. The expensive work —
+sanitising a deep object, trimming an oversized payload, building a report — happens once per record
 or on demand, never per render.
 
 ### Does it work in Safari private mode?
@@ -999,7 +999,7 @@ your app.
 
 ### Does it work with SSR / Next.js?
 
-Importing is safe Ã¢â‚¬â€ no module-level code touches `window` or `indexedDB`, so the package loads in
+Importing is safe — no module-level code touches `window` or `indexedDB`, so the package loads in
 Node, in an SSR framework and inside a Web Worker. `initTelemetry` on the server installs nothing and
 stores nothing. In Next.js, call it from a `'use client'` component's effect, as shown in
 [Next.js (App Router)](#nextjs-app-router); that also keeps it out of the server bundle.
@@ -1008,8 +1008,8 @@ stores nothing. In Next.js, call it from a `'use client'` component's effect, as
 
 Yes, and it is an explicit design goal. Process-wide state lives on
 `globalThis[Symbol.for('logvault@1')]`, so two bundled copies of the library resolve to the *same*
-instance and share one set of listeners instead of double-capturing. `initTelemetry` is idempotent Ã¢â‚¬â€
-a second call from HMR, a duplicate bundle or a careless component installs nothing new Ã¢â‚¬â€ and each
+instance and share one set of listeners instead of double-capturing. `initTelemetry` is idempotent —
+a second call from HMR, a duplicate bundle or a careless component installs nothing new — and each
 remote can call `destroyTelemetry()` in its own teardown without disturbing the host.
 
 ### What about GDPR and the right to erasure?
@@ -1051,12 +1051,12 @@ Or from the environment: `VITE_TELEMETRY_ENABLED=false` with `env: true`.
 
 ### How do I test my code that uses @codewithrajat/rm-logvault?
 
-Use `@codewithrajat/rm-logvault/testing`. The in-memory repository mirrors the real IndexedDB semantics Ã¢â‚¬â€
-pending-only aggregation, atomic claiming, stale-claim recovery, retention cleanup Ã¢â‚¬â€ so a passing test exercises
+Use `@codewithrajat/rm-logvault/testing`. The in-memory repository mirrors the real IndexedDB semantics —
+pending-only aggregation, atomic claiming, stale-claim recovery, retention cleanup — so a passing test exercises
 real logic rather than a stub, and needs no browser and no fake IndexedDB.
 
 ```ts
-// src/checkout.test.ts Ã¢â‚¬â€ a unit test
+// src/checkout.test.ts — a unit test
 import { initTelemetry, captureError, logger, flushTelemetry, destroyTelemetry } from '@codewithrajat/rm-logvault';
 import { createMemoryRepository, createFakeTransport } from '@codewithrajat/rm-logvault/testing';
 
@@ -1075,14 +1075,14 @@ expect(transport.requests).toHaveLength(1);
 destroyTelemetry();
 ```
 
-`createFakeTransport` can script every upload branch Ã¢â‚¬â€ success, retryable, terminal, `Retry-After`,
-transport rejection Ã¢â‚¬â€ and `createMemoryRepository({ failWith: 'unavailable' })` or `{ quotaAt: 10 }`
+`createFakeTransport` can script every upload branch — success, retryable, terminal, `Retry-After`,
+transport rejection — and `createMemoryRepository({ failWith: 'unavailable' })` or `{ quotaAt: 10 }`
 exercises the degraded-storage and quota-recovery paths.
 
 ### Do I need a server, a backend or an account?
 
 **No.** This is the question everybody asks, so here is the whole answer. The default `mode: 'local'`
-writes everything to IndexedDB and makes **zero network requests** Ã¢â‚¬â€ no backend, no account, no API
+writes everything to IndexedDB and makes **zero network requests** — no backend, no account, no API
 key, no sign-up, nothing to run. You only add a backend if you want the records uploaded somewhere,
 and then it is your own endpoint.
 
@@ -1090,7 +1090,7 @@ The only network call logVault can ever make is a `POST` to an endpoint **you** 
 built-in collector, no telemetry of its own, no "phone home". If you configure nothing, it sends
 nothing.
 
-To upload as well, give it a URL Ã¢â‚¬â€ `mode` is inferred for you, and supplying one switches it to
+To upload as well, give it a URL — `mode` is inferred for you, and supplying one switches it to
 `'remote'`:
 
 ```ts
@@ -1121,7 +1121,7 @@ initTelemetry({ appName: 'my-app', mode: 'local' });
 
 **In `'remote'` mode, records still go to IndexedDB first.** Always. The upload is a second step that
 reads from the database. So if your endpoint is down, if the user is on a plane, if your server is
-mid-deploy Ã¢â‚¬â€ nothing is lost. Records sit there marked `pending` and are uploaded when the endpoint
+mid-deploy — nothing is lost. Records sit there marked `pending` and are uploaded when the endpoint
 starts answering again.
 
 > **One thing to know:** setting `mode: 'remote'` without configuring a valid endpoint does not
@@ -1159,7 +1159,7 @@ minified and gzipped, by `scripts/measure-size.mjs`:
 | `events` + context builders      | 33.10 kB   |
 | whole barrel, `dist/index.js`    | 36.55 kB   |
 
-Framework adapters are separate subpaths and **no framework is ever bundled** Ã¢â‚¬â€ React, Vue, Angular,
+Framework adapters are separate subpaths and **no framework is ever bundled** — React, Vue, Angular,
 axios and TanStack Query all stay external, provided by your app. `http` and `storage` are subpaths
 with no peer at all. The regression budget is 37 kB, enforced in CI, so an accidentally-bundled
 dependency fails the build.
@@ -1202,15 +1202,15 @@ eviction, and a blocked upgrade. Each one is documented with what it does to you
 
 Server-side rendering is safe: no module-level code touches a browser global, and every accessor
 checks first. `initTelemetry` on the server installs no listeners and finds no database, so nothing
-is persisted Ã¢â‚¬â€ call it from browser code only.
+is persisted — call it from browser code only.
 
 ### Not Supported
 
-- Server-side persistence Ã¢â‚¬â€ `initTelemetry` on the server installs nothing and stores nothing.
-- Environments without IndexedDB and without a custom `repository` Ã¢â‚¬â€ capture, redaction and console
+- Server-side persistence — `initTelemetry` on the server installs nothing and stores nothing.
+- Environments without IndexedDB and without a custom `repository` — capture, redaction and console
   output keep working, but `getTelemetryStatus().storage` reports `'unavailable'` and nothing is
   persisted.
-- The `Ctrl+Shift+Alt+D` shortcut on phones and tablets Ã¢â‚¬â€ there is no keyboard, so call
+- The `Ctrl+Shift+Alt+D` shortcut on phones and tablets — there is no keyboard, so call
   `exportDiagnosticsReport()` from a button instead.
 
 ---
@@ -1236,7 +1236,7 @@ Two rules apply everywhere:
 | `buildId`         | `string \| undefined`                                      | `undefined`                 | Build identifier (a commit SHA, a CI run id) so a report points at a deploy.                       |
 | `environment`     | `string \| undefined`                                      | `undefined`                 | Deployment environment, e.g. `production`.                                                         |
 | `enabled`         | `boolean \| undefined`                                     | `true`                      | Master switch. `false` makes every capture a no-op and buffers nothing.                            |
-| `mode`            | `'local' \| 'remote' \| undefined`                         | inferred Ã¢â‚¬â€ see below        | Where records go. See [Do I need a server?](#do-i-need-a-server-a-backend-or-an-account).                                  |
+| `mode`            | `'local' \| 'remote' \| undefined`                         | inferred — see below        | Where records go. See [Do I need a server?](#do-i-need-a-server-a-backend-or-an-account).                                  |
 | `dbPrefix`        | `string \| undefined`                                      | `'rm-logvault'`                | Database name prefix; produces `rm-logvault-errors` and `rm-logvault-logs`.                              |
 | `openTimeoutMs`   | `number \| undefined`                                      | `5000`                      | How long to wait for an IndexedDB `open()` before declaring storage unavailable.                          |
 | `env`             | `boolean \| string \| string[] \| undefined`               | `undefined` (off)           | Opt in to reading build-time env vars. `true` uses `VITE_` / `NEXT_PUBLIC_` / `REACT_APP_`.        |
@@ -1250,7 +1250,7 @@ Two rules apply everywhere:
 | `repository`      | `TelemetryRepository \| undefined`                         | IndexedDB                   | Swap IndexedDB for a custom backend. `@codewithrajat/rm-logvault/testing` ships an in-memory one.                    |
 | `logSource`       | `ExternalLogSource \| undefined`                           | `undefined`                 | Attach to an existing application logger that exposes `addSink`.                                   |
 
-`mode` inference: `'remote'` when uploads are actually enabled Ã¢â‚¬â€ that is, when `rest.enabled` is true,
+`mode` inference: `'remote'` when uploads are actually enabled — that is, when `rest.enabled` is true,
 which itself defaults to true when you supply `rest.errorsUrl`, `rest.logsUrl` or a custom
 `rest.transport`. Configuring endpoints and then switching them off with `rest.enabled: false` reports
 `'local'`, because that is what is happening. An explicit `mode` always wins over the inference.
@@ -1276,7 +1276,7 @@ which itself defaults to true when you supply `rest.errorsUrl`, `rest.logsUrl` o
 | Option             | Type                                                    | Default     | What it does                                                                                    |
 | ------------------ | ------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------- |
 | `enabled`          | `boolean \| undefined`                                  | `true`      | Save logs at all.                                                                               |
-| `level`            | `LogLevelSetting \| undefined`                          | `'warn'`    | The **persisted** level Ã¢â‚¬â€ the minimum level written to the database. Independent of the console level. |
+| `level`            | `LogLevelSetting \| undefined`                          | `'warn'`    | The **persisted** level — the minimum level written to the database. Independent of the console level. |
 | `consoleLevel`     | `LogLevelSetting \| undefined`                          | **none**    | The **console** level, applied at init. Omitting it leaves the logger's own level alone, so initialising telemetry never changes console output by itself. |
 | `maxRecords`       | `number \| undefined`                                   | `2000`      | Hard cap on retained log rows.                                                                  |
 | `retentionDays`    | `number \| undefined`                                   | `3`         | Delete logs older than this. `0` disables the age cutoff.                                       |
@@ -1349,7 +1349,7 @@ order. The first non-empty match wins.
 | `ERROR_TRACKING_MAX_PAYLOAD_BYTES`     | `errors.maxPayloadBytes`    | UTF-8 bytes per record                 | `16384`   |
 | `ERROR_TRACKING_MAX_EVENTS_PER_MINUTE` | `errors.maxEventsPerMinute` | events / 60 s; `0` = unlimited         | `120`     |
 | `LOG_PERSIST_ENABLED`                  | `logs.enabled`              | `true`/`false`                         | `true`    |
-| `LOG_LEVEL`                            | `logs.consoleLevel`         | level Ã¢â‚¬â€ console only                   | unchanged |
+| `LOG_LEVEL`                            | `logs.consoleLevel`         | level — console only                   | unchanged |
 | `LOG_PERSIST_LEVEL`                    | `logs.level`                | level; empty inherits `LOG_LEVEL`      | `warn`    |
 | `LOG_PERSIST_RETENTION_DAYS`           | `logs.retentionDays`        | days; `0` = no age cutoff              | `3`       |
 | `LOG_PERSIST_MAX_RECORDS`              | `logs.maxRecords`           | rows                                   | `2000`    |
@@ -1365,9 +1365,9 @@ order. The first non-empty match wins.
 
 So the full spellings include `VITE_APP_NAME`, `NEXT_PUBLIC_ERROR_TRACKING_REST_URL` and
 `REACT_APP_LOG_PERSIST_MAX_RECORDS`. Booleans accept `true`/`1`/`yes`/`on` and `false`/`0`/`no`/`off`,
-case-insensitively; anything else is ignored, and so is an unparseable or negative number Ã¢â‚¬â€ a typo
+case-insensitively; anything else is ignored, and so is an unparseable or negative number — a typo
 falls back to the default rather than silently changing behaviour. **The core never reads
-`import.meta.env` unless you opt in** Ã¢â‚¬â€ that is what keeps it usable in Node, in SSR and in a plain
+`import.meta.env` unless you opt in** — that is what keeps it usable in Node, in SSR and in a plain
 `<script type="module">`.
 
 Older names (`TELEMETRY_ERRORS_ENABLED`, `TELEMETRY_LOGS_ENABLED`, `TELEMETRY_PERSIST_LEVEL`,
@@ -1388,7 +1388,7 @@ initTelemetry({ env: ['VITE_', 'PUBLIC_'] }); // several, in order
 ```
 
 **Do not spread `fromEnv()` into the options object.** It returns a *flat* object
-(`errorsEnabled`, `logsMaxRecords`, `errorsUrl`, Ã¢â‚¬Â¦) while the environment layer is read only through
+(`errorsEnabled`, `logsMaxRecords`, `errorsUrl`, …) while the environment layer is read only through
 `options.env`, so a spread carries just the six top-level identity fields and silently drops every
 nested one. Use `env:` for the environment, or `fromEnv()` when you want to read the values and place
 them yourself:
@@ -1429,7 +1429,7 @@ One `POST` per record kind, per batch, with `Content-Type: application/json`. Th
 and stable:
 
 ```jsonc
-// the request body logVault sends Ã¢â‚¬â€ you do not write this file
+// the request body logVault sends — you do not write this file
 {
   "schemaVersion": 1,
   "kind": "errors", // or "logs"
@@ -1447,7 +1447,7 @@ and stable:
       "severity": "error",
       "name": "TypeError",
       "message": "Cannot read properties of undefined (reading 'total')",
-      "stack": "TypeError: Ã¢â‚¬Â¦\n    at total (/assets/checkout-8f3c2ab.js:1:48213)",
+      "stack": "TypeError: …\n    at total (/assets/checkout-8f3c2ab.js:1:48213)",
       "occurrenceCount": 3,
       "firstSeen": 1759482900000,
       "lastSeen": 1759482901500,
@@ -1457,33 +1457,33 @@ and stable:
 }
 ```
 
-Your response only needs a status code. **The body is never read** Ã¢â‚¬â€ not on success, not on failure.
+Your response only needs a status code. **The body is never read** — not on success, not on failure.
 
 ### Status-code handling
 
 | Status                                                        | Outcome     | What logVault does                                                                                |
 | ------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------- |
-| `200`Ã¢â‚¬â€œ`299`                                                   | `ok`        | Records are deleted locally, then the next batch is claimed.                                       |
+| `200`–`299`                                                   | `ok`        | Records are deleted locally, then the next batch is claimed.                                       |
 | `400`, `401`, `403`, `404`, `405`, `410`, `413`, `415`, `422` | `terminal`  | Records are marked `failed` and stop being retried automatically. `onTerminalFailure` is called.    |
 | `408`, `429`, every `5xx`                                     | `retryable` | Records go back to `pending`, the run stops, and the next attempt is scheduled with backoff.       |
 | Network error, timeout, abort, or a throwing transport        | `retryable` | Same as above.                                                                                     |
 | `0` (the request never landed)                                | `retryable` | Treated as retryable.                                                                              |
 
 The terminal set is closed: `400, 401, 403, 404, 405, 410, 413, 415, 422`. Everything else is
-retried Ã¢â‚¬â€ including statuses you might not expect, such as `402`, `406`, `409` and `418`.
+retried — including statuses you might not expect, such as `402`, `406`, `409` and `418`.
 
 ### Backoff and `Retry-After`
 
-After a failure the next attempt waits `min(15000 Ãƒâ€” 2^(failures-1), 900000)` ms: 15 s, 30 s, 60 s, Ã¢â‚¬Â¦
+After a failure the next attempt waits `min(15000 × 2^(failures-1), 900000)` ms: 15 s, 30 s, 60 s, …
 up to 15 minutes. On success the counter resets and the steady `rest.intervalMs` (30 s by default)
 resumes. A `Retry-After` header is honoured in both forms (`120`, or an HTTP date), clamped to
-15 minutes, and combined as `max(backoff, retryAfter)` Ã¢â‚¬â€ so your server can slow the client down but
+15 minutes, and combined as `max(backoff, retryAfter)` — so your server can slow the client down but
 never speed it up.
 
 ### Duplicates and idempotency
 
 logVault deletes a record **only after** your server answers with a 2xx. If the response is lost
-after your side committed Ã¢â‚¬â€ a dropped connection, a proxy timeout, the user closing the tab Ã¢â‚¬â€ the
+after your side committed — a dropped connection, a proxy timeout, the user closing the tab — the
 record is sent again. Delivery is therefore **at least once**, and duplicate `id`s are normal.
 
 The `id` is generated once and never changes across retries, so key on it and make the repeat a
@@ -1498,7 +1498,7 @@ ON CONFLICT (id) DO NOTHING;
 ### After a re-authentication (the 401 case)
 
 A `401` marks the batch `failed` permanently. That is right for a malformed request and wrong for an
-expired token Ã¢â‚¬â€ otherwise one stale session silently discards everything captured while it was
+expired token — otherwise one stale session silently discards everything captured while it was
 stale. After refreshing credentials, put them back in the queue:
 
 ```ts
@@ -1506,7 +1506,7 @@ stale. After refreshing credentials, put them back in the queue:
 import { retryFailedTelemetry, syncTelemetry } from '@codewithrajat/rm-logvault';
 
 await refreshSession();
-const requeued = await retryFailedTelemetry(); // 'failed' Ã¢â€ â€™ 'pending', backoff cleared
+const requeued = await retryFailedTelemetry(); // 'failed' → 'pending', backoff cleared
 await syncTelemetry(); // upload right now instead of waiting
 ```
 
@@ -1542,7 +1542,7 @@ them in.
 optional, separate entry points that exist precisely so a Vue app never ships React code.
 
 **Browser support.** Evergreen Chrome, Edge, Firefox and Safari (last 2 versions). IndexedDB is used
-directly, through `globalThis.indexedDB`, with no wrapper and nothing to polyfill Ã¢â‚¬â€ but availability
+directly, through `globalThis.indexedDB`, with no wrapper and nothing to polyfill — but availability
 is not durability, and the limits that actually bite (Safari's seven-day cap on script-writable
 storage, private windows, third-party partitioning and opaque origins, quota and eviction, a blocked
 upgrade) are documented with what each one does to your data in
@@ -1560,11 +1560,11 @@ declarations for every subpath. No `@types` package needed.
 | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | The report is empty                           | Nothing was captured yet, storage is unavailable, or the export raced a pending write                                | Call `await flushTelemetry()` first, then check `getTelemetryStatus().pending`                                                   |
 | Storage reports `unavailable`                 | Safari private mode, a sandboxed iframe, IndexedDB turned off, or server-side rendering                               | Check `getTelemetryStatus().storage`; `onInternalError` will have reported a `storage (unavailable)` stage                       |
-| Info-level logs are missing                   | `logs.level` defaults to `'warn'`                                                                                    | Set `logs: { level: 'info' }` Ã¢â‚¬â€ `logger.setLevel` does **not** affect what is saved                                             |
+| Info-level logs are missing                   | `logs.level` defaults to `'warn'`                                                                                    | Set `logs: { level: 'info' }` — `logger.setLevel` does **not** affect what is saved                                             |
 | Nothing is uploaded                           | No endpoint configured, `rest.enabled` resolved to `false`, or the URL failed validation                             | Confirm `rest.errorsUrl` is set and valid, and that `getTelemetryStatus().mode` is `'remote'`                                   |
 | The shortcut does nothing                     | Focus is inside an input/textarea/`contenteditable`, `allow()` returned false, an extra modifier is held, or `shortcut: false` | Click the page background first, then check the modifiers and your `allow` gate                                                 |
 | CORS errors on upload                         | The endpoint does not allow your origin, or does not answer the `OPTIONS` preflight                                  | Check the failing request in the Network tab; the server needs `Access-Control-Allow-Origin` and `Access-Control-Allow-Headers` |
-| CSP blocks the upload                         | `connect-src` does not include the endpoint origin                                                                    | Add the origin to `connect-src` Ã¢â‚¬â€ a missing directive falls back to `default-src`                                                |
+| CSP blocks the upload                         | `connect-src` does not include the endpoint origin                                                                    | Add the origin to `connect-src` — a missing directive falls back to `default-src`                                                |
 | Records are stuck in `failed`                 | A terminal status (`400`, `401`, `403`, `404`, `405`, `410`, `413`, `415`, `422`) marked the whole batch              | Inspect `onTerminalFailure`'s arguments, fix the cause, then call `retryFailedTelemetry()`                                      |
 | The same error appears twice                  | At-least-once delivery after a lost 2xx, or two separate copies of the library in different module realms             | Key your server on the record `id`; check for a duplicate bundled copy                                                          |
 | Errors thrown before `initTelemetry` are missing | The 50-entry pre-init buffer overflowed, or `enabled: false` suppressed them                                        | Call `initTelemetry` as early as you can; the buffer keeps the oldest 50 and drops the newest overflow                          |
@@ -1636,21 +1636,19 @@ Need assistance? We're here to help!
 - [GitHub Repository](https://github.com/malikrajat/rm-logvault)
 - [npm Package](https://www.npmjs.com/package/@codewithrajat/rm-logvault)
 - [Changelog](https://github.com/malikrajat/rm-logvault/blob/main/CHANGELOG.md)
-- [docs/README.md](docs/README.md) Ã¢â‚¬â€ index of every document, with a one-line summary of each.
-- [examples/README.md](examples/README.md) Ã¢â‚¬â€ runnable code for every feature, in each of five frameworks Ã¢â‚¬â€ vanilla, React, Vue, Angular and Next.js Ã¢â‚¬â€ organised into `basic`, `advanced`, `config` and `more-advanced` tiers.
-- [React: a complete integration, in order](examples/react/START-HERE.md) Ã¢â‚¬â€ **New to the library? Start here.** A linear walkthrough Ã¢â‚¬â€ four steps, two files Ã¢â‚¬â€ from nothing to a working React setup with a real fallback UI.
-- [docs/API.md](docs/API.md) Ã¢â‚¬â€ every exported symbol, with signatures and examples.
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) Ã¢â‚¬â€ the capture pipeline, the diagnostics-export path, sequence diagrams and the load-bearing mechanisms.
-- [docs/CONFIGURATION.md](docs/CONFIGURATION.md) Ã¢â‚¬â€ the exhaustive option reference, precedence and presets.
-- [docs/OPTIONS-CHEATSHEET.md](docs/OPTIONS-CHEATSHEET.md) Ã¢â‚¬â€ the complete options object, every default inline, a deep dive per option and six presets.
-- [docs/REST-CONTRACT.md](docs/REST-CONTRACT.md) Ã¢â‚¬â€ the wire format, JSON Schema, status codes and server obligations.
-- [docs/SECURITY.md](docs/SECURITY.md) Ã¢â‚¬â€ threat model, redaction design, XSS safety and disclosure policy.
-- [docs/PRIVACY-GDPR.md](docs/PRIVACY-GDPR.md) Ã¢â‚¬â€ lawful basis, retention, erasure and the consent gate.
-- [docs/BROWSER-SUPPORT.md](docs/BROWSER-SUPPORT.md) Ã¢â‚¬â€ IndexedDB availability, and the browser storage limits that bite.
-- [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) Ã¢â‚¬â€ symptom-by-symptom diagnosis and fixes.
-- [docs/DECISIONS.md](docs/DECISIONS.md) Ã¢â‚¬â€ the architecture decision log, with alternatives considered.
-- [llms.txt](llms.txt) Ã¢â‚¬â€ a machine-readable index for AI assistants.
-- [AGENTS.md](AGENTS.md) Ã¢â‚¬â€ the invariants a coding agent must not break.
+- [docs/README.md](docs/README.md) — index of every document, with a one-line summary of each.
+- [examples/README.md](examples/README.md) — runnable code for every feature, in each of five frameworks — vanilla, React, Vue, Angular and Next.js — organised into `basic`, `advanced`, `config` and `more-advanced` tiers.
+- [React: a complete integration, in order](examples/react/START-HERE.md) — **New to the library? Start here.** A linear walkthrough — four steps, two files — from nothing to a working React setup with a real fallback UI.
+- [docs/API.md](docs/API.md) — every exported symbol, with signatures and examples.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — the capture pipeline, the diagnostics-export path, sequence diagrams and the load-bearing mechanisms.
+- [docs/CONFIGURATION.md](docs/CONFIGURATION.md) — the exhaustive option reference, precedence and presets.
+- [docs/OPTIONS-CHEATSHEET.md](docs/OPTIONS-CHEATSHEET.md) — the complete options object, every default inline, a deep dive per option and six presets.
+- [docs/REST-CONTRACT.md](docs/REST-CONTRACT.md) — the wire format, JSON Schema, status codes and server obligations.
+- [docs/SECURITY.md](docs/SECURITY.md) — threat model, redaction design, XSS safety and disclosure policy.
+- [docs/PRIVACY-GDPR.md](docs/PRIVACY-GDPR.md) — lawful basis, retention, erasure and the consent gate.
+- [docs/BROWSER-SUPPORT.md](docs/BROWSER-SUPPORT.md) — IndexedDB availability, and the browser storage limits that bite.
+- [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) — symptom-by-symptom diagnosis and fixes.
+- [docs/DECISIONS.md](docs/DECISIONS.md) — the architecture decision log, with alternatives considered.
 
 ### Community
 
@@ -1732,7 +1730,7 @@ Special thanks to:
 
 | Library | Description | Link |
 | --- | --- | --- |
-| **@codewithrajat/rm-logvault** | Offline-first browser error tracking, logging and one-file diagnostics export. Redacts PII before writing, stores in IndexedDB, uploads only to your own endpoint. **Zero dependencies, tree-shakeable, framework-agnostic** Ã¢â‚¬â€ React, Vue, Angular, axios and TanStack Query adapters included. | [![GitHub](https://img.shields.io/badge/GitHub-Repository-blue?logo=github)](https://github.com/malikrajat/rm-logvault) [![npm](https://img.shields.io/npm/v/@codewithrajat/rm-logvault.svg)](https://www.npmjs.com/package/@codewithrajat/rm-logvault) |
+| **@codewithrajat/rm-logvault** | Offline-first browser error tracking, logging and one-file diagnostics export. Redacts PII before writing, stores in IndexedDB, uploads only to your own endpoint. **Zero dependencies, tree-shakeable, framework-agnostic** — React, Vue, Angular, axios and TanStack Query adapters included. | [![GitHub](https://img.shields.io/badge/GitHub-Repository-blue?logo=github)](https://github.com/malikrajat/rm-logvault) [![npm](https://img.shields.io/npm/v/@codewithrajat/rm-logvault.svg)](https://www.npmjs.com/package/@codewithrajat/rm-logvault) |
 
 ---
 
@@ -1875,8 +1873,8 @@ Author of 10+ open-source libraries and 100+ technical articles, driving innovat
 </p>
 
 <p align="center">
-  <a href="https://github.com/malikrajat/rm-logvault/stargazers">Star on GitHub</a> Ã¢â‚¬Â¢
-  <a href="https://www.npmjs.com/package/@codewithrajat/rm-logvault">View on npm</a> Ã¢â‚¬Â¢
+  <a href="https://github.com/malikrajat/rm-logvault/stargazers">Star on GitHub</a> •
+  <a href="https://www.npmjs.com/package/@codewithrajat/rm-logvault">View on npm</a> •
   <a href="https://github.com/malikrajat/rm-logvault/issues">Report Issue</a>
 </p>
 

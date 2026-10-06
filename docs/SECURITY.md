@@ -6,7 +6,7 @@ and it produces a file an end user emails to someone. This document is the hones
 protects what, what does not, and how to report a problem.
 
 The library is small on purpose. Almost every security property below comes from a structural
-decision â€” one sanitizer, one egress path, one place that touches `console` â€” rather than from a
+decision — one sanitizer, one egress path, one place that touches `console` — rather than from a
 check that could be forgotten.
 
 ---
@@ -31,7 +31,7 @@ check that could be forgotten.
    attacker.
 2. **A shared or public computer.** The vault persists between sessions. `clearTelemetryData()`
    exists for this adversary.
-3. **An XSS payload.** Controls record content â€” a message, a URL, a tag, an `extra` field â€” and
+3. **An XSS payload.** Controls record content — a message, a URL, a tag, an `extra` field — and
    tries to turn the diagnostics report into script execution, or to break out of the embedded JSON
    script element.
 4. **A hostile or compromised log source.** An application (or a dependency) that logs attacker-
@@ -51,7 +51,7 @@ check that could be forgotten.
 - **Authentication of the client.** A record's `appName` is whatever the application says it is. The
   server must authenticate the caller if it cares.
 - **Data-loss prevention.** Anyone with DevTools access can read the databases directly. The
-  shortcut is a convenience, not a boundary (see Â§7).
+  shortcut is a convenience, not a boundary (see §7).
 - **Protecting the application from a malicious library.** The library runs in the page and could do
   anything. What it _does_ do is enumerated below.
 - **Symbolication or source-map security.** There are no source maps involved.
@@ -82,18 +82,18 @@ Under all inputs, including hostile ones:
 
 | Rule                    | Mechanism                                                                                                                                                                                                                                                                     | Example                                                                                       |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| **Sensitive keys**      | `SENSITIVE_KEY_PATTERN` tested against the lowercased key with `[-_\s]` stripped                                                                                                                                                                                              | `access-token`, `accessToken`, `ACCESS TOKEN` â†’ all normalise to `accesstoken` â†’ `[REDACTED]` |
-| **JWTs**                | `JWT_PATTERN` = `/\beyJ[\w-]{5,}\.[\w-]{5,}\.[\w-]*/g`                                                                                                                                                                                                                        | `eyJhbGciOiâ€¦.eyJzdWIiâ€¦.SflKxwRJ` â†’ `[REDACTED]`                                               |
-| **Auth schemes**        | `AUTH_SCHEME_PATTERN` = `/\b(Bearer\|Basic\|Token)\s+[\w.~+/=-]{6,}/gi`, replaced with `'$1 [REDACTED]'`                                                                                                                                                                      | `Authorization: Bearer abc123xyz` â†’ `Authorization: Bearer [REDACTED]`                        |
-| **`key=value` secrets** | `KV_SECRET_PATTERNS`, four patterns covering `token`/`access_token`/`refresh_token`/`id_token`, `password`/`pwd`/`secret`/`client_secret`, `api_key`/`api-key`/`apikey`/`session`/`sessionid`, and `phone`/`mobile`/`msisdn`/`telephone`/`email`. The separator is preserved. | `?token=abc&page=2` â†’ `?token=[REDACTED]&page=2`, `phone=+1415â€¦` â†’ `phone=[REDACTED]`         |
-| **Long opaque tokens**  | `LONG_SECRET_TEXT_PATTERN` = `/(^\|[^\w-])([\w-]{32,200})(?=[^\w-]\|$)/g`, replaced with `'$1[REDACTED]'` â€” a 32â€“200 character `[\w-]` run in free text with no `key=value` context. The 200 upper bound keeps prose and serialised structures from being redacted wholesale. | `sk_live_51H8xâ€¦` â†’ `[REDACTED]`                                                               |
-| **E-mail addresses**    | `EMAIL_PATTERN` = `/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g`                                                                                                                                                                                                                           | `dev@example.com` â†’ `[REDACTED]`                                                              |
-| **URL credentials**     | The URL is rebuilt as `protocol//host` plus a sanitized path and query, so `user:pass@` is dropped by construction rather than by matching                                                                                                                                    | `https://u:p@api.test/x` â†’ `https://api.test/x`                                               |
-| **URL fragments**       | Everything from `#` onwards is discarded                                                                                                                                                                                                                                      | `/orders#access_token=â€¦` â†’ `/orders`                                                          |
-| **URL query values**    | Rebuilt key by key: a value survives only if its key is allow-listed **and** not sensitive                                                                                                                                                                                    | `?email=a@b.co` â†’ `?email=[REDACTED]`                                                         |
-| **Path segments**       | A segment that decodes to an e-mail, starts with `eyJ`, or matches `LONG_SECRET_PATTERN` (`/^[\w-]{32,}$/`) is replaced                                                                                                                                                       | `/invite/dev@example.com` â†’ `/invite/[REDACTED]`                                              |
-| **Non-web schemes**     | Anything that is not `http:` or `https:` collapses to `` `${scheme}[REDACTED]` ``; `data:` becomes `data:[REDACTED]`                                                                                                                                                          | `mailto:dev@example.com` â†’ `mailto:[REDACTED]`                                                |
-| **Stack cache busters** | `STACK_QUERY_PATTERN` removes `?t=`/`?v=` before the stack is scrubbed                                                                                                                                                                                                        | `/src/App.tsx?t=1712345:12:3` â†’ `/src/App.tsx:12:3`                                           |
+| **Sensitive keys**      | `SENSITIVE_KEY_PATTERN` tested against the lowercased key with `[-_\s]` stripped                                                                                                                                                                                              | `access-token`, `accessToken`, `ACCESS TOKEN` → all normalise to `accesstoken` → `[REDACTED]` |
+| **JWTs**                | `JWT_PATTERN` = `/\beyJ[\w-]{5,}\.[\w-]{5,}\.[\w-]*/g`                                                                                                                                                                                                                        | `eyJhbGciOi….eyJzdWIi….SflKxwRJ` → `[REDACTED]`                                               |
+| **Auth schemes**        | `AUTH_SCHEME_PATTERN` = `/\b(Bearer\|Basic\|Token)\s+[\w.~+/=-]{6,}/gi`, replaced with `'$1 [REDACTED]'`                                                                                                                                                                      | `Authorization: Bearer abc123xyz` → `Authorization: Bearer [REDACTED]`                        |
+| **`key=value` secrets** | `KV_SECRET_PATTERNS`, four patterns covering `token`/`access_token`/`refresh_token`/`id_token`, `password`/`pwd`/`secret`/`client_secret`, `api_key`/`api-key`/`apikey`/`session`/`sessionid`, and `phone`/`mobile`/`msisdn`/`telephone`/`email`. The separator is preserved. | `?token=abc&page=2` → `?token=[REDACTED]&page=2`, `phone=+1415…` → `phone=[REDACTED]`         |
+| **Long opaque tokens**  | `LONG_SECRET_TEXT_PATTERN` = `/(^\|[^\w-])([\w-]{32,200})(?=[^\w-]\|$)/g`, replaced with `'$1[REDACTED]'` — a 32–200 character `[\w-]` run in free text with no `key=value` context. The 200 upper bound keeps prose and serialised structures from being redacted wholesale. | `sk_live_51H8x…` → `[REDACTED]`                                                               |
+| **E-mail addresses**    | `EMAIL_PATTERN` = `/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g`                                                                                                                                                                                                                           | `dev@example.com` → `[REDACTED]`                                                              |
+| **URL credentials**     | The URL is rebuilt as `protocol//host` plus a sanitized path and query, so `user:pass@` is dropped by construction rather than by matching                                                                                                                                    | `https://u:p@api.test/x` → `https://api.test/x`                                               |
+| **URL fragments**       | Everything from `#` onwards is discarded                                                                                                                                                                                                                                      | `/orders#access_token=…` → `/orders`                                                          |
+| **URL query values**    | Rebuilt key by key: a value survives only if its key is allow-listed **and** not sensitive                                                                                                                                                                                    | `?email=a@b.co` → `?email=[REDACTED]`                                                         |
+| **Path segments**       | A segment that decodes to an e-mail, starts with `eyJ`, or matches `LONG_SECRET_PATTERN` (`/^[\w-]{32,}$/`) is replaced                                                                                                                                                       | `/invite/dev@example.com` → `/invite/[REDACTED]`                                              |
+| **Non-web schemes**     | Anything that is not `http:` or `https:` collapses to `` `${scheme}[REDACTED]` ``; `data:` becomes `data:[REDACTED]`                                                                                                                                                          | `mailto:dev@example.com` → `mailto:[REDACTED]`                                                |
+| **Stack cache busters** | `STACK_QUERY_PATTERN` removes `?t=`/`?v=` before the stack is scrubbed                                                                                                                                                                                                        | `/src/App.tsx?t=1712345:12:3` → `/src/App.tsx:12:3`                                           |
 
 The placeholder is always the literal string `[REDACTED]`, exported as `REDACTED`. Using one fixed
 placeholder means redaction is **idempotent**: re-running the sanitizer over an already-redacted
@@ -135,7 +135,7 @@ A value under a sensitive key is redacted regardless of its type or content. `{ 
 `{ token: { nested: 'x' } }` are both `[REDACTED]`, not a partially-walked object that might leak a
 field the pattern did not anticipate.
 
-`isSensitiveKey` fails **closed** â€” if the check itself throws (the only realistic cause being a
+`isSensitiveKey` fails **closed** — if the check itself throws (the only realistic cause being a
 caller-supplied `RegExp` with a hostile `test`), it returns `true`:
 
 ```ts
@@ -166,7 +166,7 @@ export const DEFAULT_ALLOWED_QUERY_PARAMS: readonly string[] = [
 ```
 
 These are the parameters whose _values_ are low-cardinality, non-identifying, and useful for
-reproducing a request. Everything else â€” including any parameter the application adds later â€” is
+reproducing a request. Everything else — including any parameter the application adds later — is
 redacted by default, which is the correct bias: a new parameter is unknown, and unknown should mean
 redacted.
 
@@ -262,8 +262,8 @@ export const UNHANDLED_SOURCES: ReadonlySet<string> = new Set([
 ## 3. XSS safety of the report, by construction
 
 The diagnostics report is an HTML file that an end user opens, e-mails, and possibly opens from a
-shared drive. It embeds untrusted data â€” error messages, URLs, tag values, `extra` fields, stack
-traces â€” and it is opened in a browser. It must not be able to execute anything.
+shared drive. It embeds untrusted data — error messages, URLs, tag values, `extra` fields, stack
+traces — and it is opened in a browser. It must not be able to execute anything.
 
 Three rules make that true.
 
@@ -306,7 +306,7 @@ Why this is sufficient, precisely:
 
 Every value reaches the DOM through `textContent` or `document.createElement`. A message containing
 `<img onerror=alert(1)>` is rendered as those literal characters in a table cell. There is no
-`innerHTML`, no `insertAdjacentHTML`, no `document.write`, and no `eval` â€” the last two are also
+`innerHTML`, no `insertAdjacentHTML`, no `document.write`, and no `eval` — the last two are also
 banned repository-wide by ESLint (`no-eval`, `no-implied-eval`, `no-new-func`, `no-script-url`).
 
 The only values interpolated into markup by string concatenation are:
@@ -335,11 +335,11 @@ The report's `<head>` contains:
 
 - `default-src 'none'` blocks `connect-src`, `font-src`, `frame-src`, `media-src`, `object-src` and
   `worker-src`. A report cannot phone home even if something in it tried to.
-- `img-src data:` allows only inline data URIs â€” there are none today; the directive exists so that
+- `img-src data:` allows only inline data URIs — there are none today; the directive exists so that
   a future icon does not silently become a network request.
 - `script-src 'unsafe-inline'` is required because the viewer is an inline script in a
   self-contained file. **This is the one directive that is not a security control**, and it is worth
-  being honest about: it means the report's XSS safety rests on Â§3.1, Â§3.2 and the escaping of every
+  being honest about: it means the report's XSS safety rests on §3.1, §3.2 and the escaping of every
   interpolated string, not on CSP. The escaping is the control; the CSP is defence in depth for
   everything that is _not_ scripts.
 - `referrer: no-referrer` prevents a leak of the file's location if the report ever contains a link.
@@ -376,10 +376,10 @@ receives the file and forwards it somewhere it should not go.
 ```ts
 const FORBIDDEN_KEYS: ReadonlySet<string> = new Set(['__proto__', 'constructor', 'prototype']);
 
-// â€¦in the walker:
+// …in the walker:
 const name = names[index];
 if (name === undefined || FORBIDDEN_KEYS.has(name)) continue;
-// â€¦
+// …
 // `Object.fromEntries` defines own data properties, so copying a literal
 // `__proto__` key cannot mutate any prototype.
 return Object.fromEntries(entries);
@@ -389,7 +389,7 @@ return Object.fromEntries(entries);
 does not go through the `[[Set]]` trap and therefore cannot walk the prototype chain. Even a literal
 `__proto__` entry would be created as an ordinary own property. The `FORBIDDEN_KEYS` skip is
 belt-and-braces on top, and it additionally drops `constructor` and `prototype`, which are the
-building blocks of a pollution chain (`constructor.prototype.x = â€¦`).
+building blocks of a pollution chain (`constructor.prototype.x = …`).
 
 **Sensible reads never touch the prototype:** `safeGet` reads an own-or-inherited property inside a
 `try`/`catch`, but it is applied to values the caller already handed over, and the walker iterates
@@ -398,7 +398,7 @@ copied into a record.
 
 **Prototypes are not the only hazard, and the walker handles the rest:** throwing getters (each read
 is wrapped, and an unreadable key becomes `[Unserializable]`), Proxies (the whole walk is inside a
-`try`/`catch` returning `[Unserializable]`), cycles (`WeakSet` â†’ `[Circular]`), and enormous objects
+`try`/`catch` returning `[Unserializable]`), cycles (`WeakSet` → `[Circular]`), and enormous objects
 (depth, key and item caps).
 
 **Why ordinary objects rather than null-prototype objects** is decision
@@ -407,8 +407,8 @@ version: null-prototype objects break `spread`, deep-equality assertions and `in
 `Object.fromEntries` is already immune to the attack the null prototype would defend against.
 
 **One nuance worth stating.** `redactRecords.ts` builds its intermediate tag bag with
-`Object.create(null)`. That object never escapes the function â€” it is used only to detect an empty
-result before reassigning onto the record â€” so it is not part of the consumer-facing contract.
+`Object.create(null)`. That object never escapes the function — it is used only to detect an empty
+result before reassigning onto the record — so it is not part of the consumer-facing contract.
 
 ---
 
@@ -424,7 +424,7 @@ characters).**
 const scrub = (input: string, maxLength: number): string => {
   // Bound the work before any regex runs.
   let text = input.length > HARD_TEXT_CAP ? input.slice(0, HARD_TEXT_CAP) : input;
-  // â€¦
+  // …
 };
 ```
 
@@ -441,17 +441,17 @@ Beyond the bound, the built-in patterns are linear by construction:
   (`[^\s&"',;]+`) rather than a lazy quantifier, which is the linear formulation of "everything up to
   the next separator".
 - The path and identifier patterns (`DIGITS_ONLY_PATTERN`, `UUID_PATTERN`, `LONG_HEX_PATTERN`,
-  `LONG_SECRET_PATTERN`) are anchored with `^â€¦$` and match fixed shapes or single character classes.
+  `LONG_SECRET_PATTERN`) are anchored with `^…$` and match fixed shapes or single character classes.
   `LONG_SECRET_TEXT_PATTERN` is bounded instead: a fixed-width `[\w-]{32,200}` run with a captured
   leading separator and a trailing lookahead, which is linear over the already-truncated input.
-- `CHUNK_ERROR_PATTERN` is an alternation of literal phrases with `i` â€” no quantifiers over groups.
+- `CHUNK_ERROR_PATTERN` is an alternation of literal phrases with `i` — no quantifiers over groups.
 - All `/g` patterns are executed through `replaceAll` or `testRe` helpers, which reset `lastIndex`
   before and after. That is a correctness measure (a stale `lastIndex` produces silently skipped
   matches) rather than a security one, but it is the same class of bug.
 
 **Caller-supplied patterns are the caller's responsibility.** `redaction.extraPatterns` and a
 `RegExp` in `redaction.extraSensitiveKeys` are executed against the same 20 000-character-bounded
-text, which caps the blast radius, but a pathological pattern can still be slow within that budget â€”
+text, which caps the blast radius, but a pathological pattern can still be slow within that budget —
 or can throw. A throwing `test` fails **closed** (the key is treated as sensitive), and a throwing
 `replace` degrades the whole text to `[REDACTED]`, because `scrub`'s caller catches. Neither can
 break the application, but both can degrade output.
@@ -503,7 +503,7 @@ const LOCAL_HOSTNAMES: ReadonlySet<string> = new Set([
 | Input                                                      | Result                                           | Why it matters                                                  |
 | ---------------------------------------------------------- | ------------------------------------------------ | --------------------------------------------------------------- |
 | `javascript:alert(1)`                                      | rejected                                         | Blocks the "endpoint is a script URL" class of attack outright. |
-| `data:text/html,â€¦`                                         | rejected                                         |                                                                 |
+| `data:text/html,…`                                         | rejected                                         |                                                                 |
 | `blob:`, `file:`, `about:`, `chrome:`, `chrome-extension:` | rejected                                         | Blocks extension- and filesystem-origin exfiltration.           |
 | `//evil.test/x` (protocol-relative)                        | resolved against the page origin, then validated | Cannot be used to switch origins without an explicit scheme.    |
 | `/telemetry/errors`                                        | resolved against `window.location.href`          | Same-origin by construction.                                    |
@@ -532,14 +532,14 @@ credentials:
 
 Consequences: no cookies are attached to a cross-origin request by default, and the server does not
 need `Access-Control-Allow-Credentials` for the default configuration. If an application sets
-`'include'`, it should also set `requireHttps: true` â€” the library does not force that pairing, but
+`'include'`, it should also set `requireHttps: true` — the library does not force that pairing, but
 it is the right one.
 
 ### 6.4 Headers come only from the allow-listed provider
 
 `TransportRequest.headers` is exactly what `rest.getHeaders()` returned, awaited per request. The
 transport adds `Content-Type: application/json` and passes the rest through. It never enumerates
-`document.cookie`, never reads a `<meta>` tag, and never consults a `<link rel=csrf>` â€” the
+`document.cookie`, never reads a `<meta>` tag, and never consults a `<link rel=csrf>` — the
 application supplies its own CSRF token through `getHeaders` if it needs one.
 
 A `getHeaders()` that throws is treated as a **retryable** failure: the batch returns to `pending`,
@@ -589,8 +589,8 @@ What the shortcut actually enforces:
 | One export at a time         | `isExportInFlight()` guard                                                                                                                                 |
 
 What it does not enforce: anything resembling authentication. Any user with keyboard access to the
-page can produce a report. If that is unacceptable â€” for example on a shared kiosk handling health
-data â€” the answer is `allow: () => false` for ordinary users, or `shortcut: false` and a
+page can produce a report. If that is unacceptable — for example on a shared kiosk handling health
+data — the answer is `allow: () => false` for ordinary users, or `shortcut: false` and a
 support-only build. Do not treat the obscurity of the key combination as a security control in a
 threat model.
 
@@ -607,7 +607,7 @@ not protect the data; it only controls one convenient way of extracting it. Prot
 | **Runtime dependencies** | **Zero.** `dependencies` is absent from `package.json`. `peerDependencies` are all optional framework peers, none of which is imported by the core entry point.                                                                                                                              |
 | **Install scripts**      | **None.** There is no `preinstall`, `install` or `postinstall` script. The only lifecycle script is `prepublishOnly`, which runs `verify` on the maintainer's machine and never on a consumer's.                                                                                             |
 | **Provenance**           | `publishConfig.provenance: true`. Every published tarball carries a Sigstore-backed attestation linking it to the workflow and commit that built it.                                                                                                                                         |
-| **CI supply-chain job**  | `.github/workflows/ci.yml` runs `pnpm audit --audit-level=high` (fail-closed), the Google OSV scanner against `pnpm-lock.yaml`, asserts that the pnpm resolve settings (a 10080-minute `minimumReleaseAge`, `blockExoticSubdeps`, and the `allowBuilds` list) are still pinned, and generates and validates a CycloneDX SBOM with `pnpm sbom` â€” in-run, storing nothing. |
+| **CI supply-chain job**  | `.github/workflows/ci.yml` runs `pnpm audit --audit-level=high` (fail-closed), the Google OSV scanner against `pnpm-lock.yaml`, asserts that the pnpm resolve settings (a 10080-minute `minimumReleaseAge`, `blockExoticSubdeps`, and the `allowBuilds` list) are still pinned, and generates and validates a CycloneDX SBOM with `pnpm sbom` — in-run, storing nothing. |
 | **Dependency cooldown**  | `pnpm-workspace.yaml` sets `minimumReleaseAge: 10080`, so a version published less than seven days ago is never resolved, downloaded or executed. A compromised release is normally pulled from the registry within hours, which makes the cooldown the cheapest control in this table: it costs nothing at runtime and cannot be bypassed by a typo in a version range. |
 | **Publish integrity**    | `publint --strict` and `attw --pack .` both run in CI and in `prepublishOnly` via `verify`, so a broken `exports` map cannot ship.                                                                                                                                                           |
 | **Size budget**          | `size-limit` enforces a 37 kB min+gzip regression budget on the core, against a measured 36.55 kB. A budget is a supply-chain control: it makes a silently bundled dependency a build failure.                                                                                               |
@@ -644,12 +644,12 @@ The library applies one policy consistently: **fail closed on safety, fail open 
 | Condition                                                | Behaviour                                                                                                                                         |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | The sanitizer cannot process a value                     | `[REDACTED]` for text, `[Unserializable]` for values. Never the raw input.                                                                        |
-| `isSensitiveKey` throws                                  | Returns `true` â€” the key is treated as sensitive.                                                                                                 |
+| `isSensitiveKey` throws                                  | Returns `true` — the key is treated as sensitive.                                                                                                 |
 | Caller-supplied `extraPatterns` throws inside `replace`  | The whole text becomes `[REDACTED]`.                                                                                                              |
-| `consent()` throws                                       | Returns `false` â€” nothing is captured, stored or uploaded.                                                                                        |
+| `consent()` throws                                       | Returns `false` — nothing is captured, stored or uploaded.                                                                                        |
 | Tag sanitization throws                                  | The tag bag is dropped entirely (`undefined`), not partially stored.                                                                              |
 | `extra` sanitization throws                              | `extra` is dropped.                                                                                                                               |
-| A record cannot be fitted to its byte budget at any tier | The record is dropped and `reportInternalFailure('payload-limit', â€¦)` fires. Storing a truncated-to-useless record is worse than storing nothing. |
+| A record cannot be fitted to its byte budget at any tier | The record is dropped and `reportInternalFailure('payload-limit', …)` fires. Storing a truncated-to-useless record is worse than storing nothing. |
 | An endpoint fails validation                             | That kind is local-only. No fallback URL.                                                                                                         |
 | A URL is unparseable                                     | Only the part before the query or fragment survives.                                                                                              |
 
@@ -669,8 +669,8 @@ The library applies one policy consistently: **fail closed on safety, fail open 
 
 ### 9.3 The one honest nuance
 
-`sanitizeErrorRecord` and `sanitizeLogRecord` â€” the optional `redactAgain` second pass used by the
-export â€” **return the record unchanged** if sanitizing throws:
+`sanitizeErrorRecord` and `sanitizeLogRecord` — the optional `redactAgain` second pass used by the
+export — **return the record unchanged** if sanitizing throws:
 
 ```ts
 } catch {
@@ -697,17 +697,17 @@ by ensuring `initTelemetry` is called with the final configuration.
 
 | Risk                                    | Status             | Control                                                                                                                                                      |
 | --------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **A03 Injection (XSS)**                 | Mitigated          | Â§3. JSON escaped for the script element; the viewer uses `textContent` only; no `innerHTML`, `eval`, `new Function` or `javascript:` URLs (ESLint-enforced). |
-| **A03 Injection (prototype pollution)** | Mitigated          | Â§4. `FORBIDDEN_KEYS` plus `Object.fromEntries`.                                                                                                              |
+| **A03 Injection (XSS)**                 | Mitigated          | §3. JSON escaped for the script element; the viewer uses `textContent` only; no `innerHTML`, `eval`, `new Function` or `javascript:` URLs (ESLint-enforced). |
+| **A03 Injection (prototype pollution)** | Mitigated          | §4. `FORBIDDEN_KEYS` plus `Object.fromEntries`.                                                                                                              |
 | **A04 Insecure design**                 | Addressed          | Never-throw public boundary; single egress point; fail-closed sanitizer; bounded everything.                                                                 |
 | **A05 Security misconfiguration**       | Addressed          | Rejected URL schemes; `requireHttps`; credentials default `'same-origin'`; the report ships its own restrictive CSP.                                         |
 | **A06 Vulnerable components**           | Minimised          | Zero runtime dependencies; `pnpm audit` and OSV in CI; SBOM artefact.                                                                                         |
 | **A08 Software and data integrity**     | Addressed          | npm provenance; committed lockfile; `pnpm install --frozen-lockfile`; allow-listed `files`.                                                                                          |
 | **A09 Logging and monitoring failures** | Inverted           | This _is_ the logging library. Its own failures are observable through `onInternalError` and the `[Telemetry]` console prefix, reported once per stage.      |
-| **A01 Broken access control**           | Partial, by design | Â§7. The shortcut is obscurity. `allow()` is the gate.                                                                                                        |
+| **A01 Broken access control**           | Partial, by design | §7. The shortcut is obscurity. `allow()` is the gate.                                                                                                        |
 | **A02 Cryptographic failures**          | Out of scope       | No cryptography is implemented. TLS is the platform's. `crypto` is used only for random ids.                                                                 |
-| **Sensitive data exposure**             | Mitigated          | Â§2. Redaction before storage and before export.                                                                                                              |
-| **ReDoS**                               | Mitigated          | Â§5. `HARD_TEXT_CAP` plus linear patterns.                                                                                                                    |
+| **Sensitive data exposure**             | Mitigated          | §2. Redaction before storage and before export.                                                                                                              |
+| **ReDoS**                               | Mitigated          | §5. `HARD_TEXT_CAP` plus linear patterns.                                                                                                                    |
 
 ---
 
@@ -743,24 +743,24 @@ We will credit you in the release notes and in the advisory unless you ask us no
 
 ### In scope
 
-- A record containing data that should have been redacted (a bypass of Â§2).
-- A path from record content to script execution or DOM injection in the diagnostics report (Â§3).
-- A prototype-pollution vector (Â§4).
-- A regular-expression denial of service reachable from untrusted input (Â§5).
+- A record containing data that should have been redacted (a bypass of §2).
+- A path from record content to script execution or DOM injection in the diagnostics report (§3).
+- A prototype-pollution vector (§4).
+- A regular-expression denial of service reachable from untrusted input (§5).
 - A network request to anywhere other than the configured endpoint, or a way to make the endpoint
-  validation accept a dangerous scheme (Â§6).
-- A way to read data the library promises never to read â€” request/response bodies, cookies,
+  validation accept a dangerous scheme (§6).
+- A way to read data the library promises never to read — request/response bodies, cookies,
   `localStorage`, `sessionStorage`, auth headers, form values.
-- A way to escape the fail-closed policy in Â§9.1.
-- A package-publishing or provenance weakness (Â§8).
+- A way to escape the fail-closed policy in §9.1.
+- A package-publishing or provenance weakness (§8).
 
 ### Out of scope
 
-- **The shortcut being discoverable.** It is documented as obscurity (Â§7).
+- **The shortcut being discoverable.** It is documented as obscurity (§7).
 - **The report containing personal data.** It is redacted, not anonymous, and the banner says so.
 - **A malicious application.** The library runs in your page; what _it_ does is enumerated here.
 - **A malicious `extraPatterns` or `extraSensitiveKeys` value.** Caller-supplied regular expressions
-  are the caller's responsibility (Â§5).
+  are the caller's responsibility (§5).
 - **The absence of at-rest encryption.** Documented as a non-goal and on the roadmap.
 - **A fully compromised device.** The databases are readable in DevTools by design.
 - **Dependency vulnerabilities.** There are no runtime dependencies. A devDependency issue is
@@ -770,9 +770,9 @@ We will credit you in the release notes and in the advisory unless you ask us no
 
 | Version      | Supported                                |
 | ------------ | ---------------------------------------- |
-| Latest `1.x` | Yes â€” current release line               |
-| Older `1.x`  | No â€” fixes are never backported          |
-| `< 1.0.0`    | No â€” pre-1.0 releases are not maintained |
+| Latest `1.x` | Yes — current release line               |
+| Older `1.x`  | No — fixes are never backported          |
+| `< 1.0.0`    | No — pre-1.0 releases are not maintained |
 
 Fixes land on the latest published version and ship as a patch on the `latest` dist-tag. There are no
 long-term-support branches and no backports, so upgrading to the latest version is the supported path;
