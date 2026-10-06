@@ -1,0 +1,837 @@
+# @codewithrajat/rm-logvault — full API reference for LLMs
+
+> Offline-first browser error tracking, logging and diagnostics export. IndexedDB-first (write-ahead outbox), optional REST sync with retry/backoff, self-contained XSS-safe HTML/JSON diagnostics report with page-load drill-down on Ctrl+Shift+Alt+D. Zero runtime dependencies. Core 36.55 kB min+gzip (37 kB regression budget). MIT. TypeScript, dual ESM+CJS.
+
+package: @codewithrajat/rm-logvault
+version: 1.0.0
+engines: node >=18 (tooling only; runtime is browser/worker/SSR-safe)
+import specifiers: @codewithrajat/rm-logvault, @codewithrajat/rm-logvault/react, @codewithrajat/rm-logvault/vue, @codewithrajat/rm-logvault/angular, @codewithrajat/rm-logvault/axios, @codewithrajat/rm-logvault/fetch, @codewithrajat/rm-logvault/react-query, @codewithrajat/rm-logvault/http, @codewithrajat/rm-logvault/storage, @codewithrajat/rm-logvault/testing, @codewithrajat/rm-logvault/package.json
+optional peers: react>=17, vue>=3, @angular/core>=15, axios>=1, @tanstack/react-query>=4
+runtime deps: none
+sideEffects: false
+type: module
+main: dist/index.cjs | module: dist/index.js | types: dist/index.d.ts
+size-limit: dist/index.js <= 37 kB min+gzip (measured 36.55 kB, minified+gzipped with all deps)
+publishConfig: { access: public, provenance: true }
+files: dist, docs, README.md, CHANGELOG.md, CONTRIBUTING.md, SECURITY.md, LICENSE, llms.txt, llms-full.txt
+
+INVARIANTS
+- The public API never throws. Fallible internals return Result<T,R> = {ok:true,value} | {ok:false,reason}.
+- initTelemetry and destroyTelemetry are idempotent.
+- Every record passes through the sanitizer before storage and before export/upload.
+- The core never reads import.meta.env / process.env unless TelemetryOptions.env opts in.
+- Transport bodies are already sanitized; a RemoteTransport never sees raw records.
+- The default fetch transport is the only network egress, and it is reachable only when
+  TelemetryOptions.mode === 'remote'. The default mode is 'local', which issues no requests at all.
+  It never reads the response body.
+- The diagnostics report never uses innerHTML and makes no network requests.
+
+## 1. QUICK START
+
+initTelemetry({ appName: 'checkout' })
+// -> global handlers + IndexedDB persistence (warn+) + Ctrl+Shift+Alt+D HTML report
+
+## 2. ALL DEFAULTS (one table)
+
+TelemetryOptions
+  appName: undefined
+  appVersion: undefined
+  buildId: undefined
+  environment: undefined
+  enabled: true
+  mode: 'local'                 (StorageMode = 'local' | 'remote'. 'local' => ZERO network requests.
+                                 Inference: rest.errorsUrl / rest.logsUrl / rest.transport implies
+                                 'remote'; none of them implies 'local'; an explicit value always wins;
+                                 mode:'local' with a URL stays local. mode:'remote' with no usable
+                                 endpoint leaves the uploader disabled and reports the stage
+                                 'mode-remote-without-endpoint' once via onInternalError; records are
+                                 still kept in IndexedDB, never discarded.)
+  dbPrefix: 'rm-logvault'           (produces rm-logvault-errors, rm-logvault-logs)
+  openTimeoutMs: 5000           ms to wait for indexedDB.open() before declaring storage unavailable
+                                (DEFAULT_OPEN_TIMEOUT_MS, shared with the storage layer)
+  env: undefined                (off; true => ['VITE_','NEXT_PUBLIC_','REACT_APP_'])
+  errors: ErrorsOptions (see below)
+  logs: LogsOptions (see below)
+  redaction: RedactionOptions (see below)
+  rest: RestOptions (see below)
+  shortcut: undefined           (enabled with defaults) | false disables
+  consent: undefined
+  onInternalError: undefined
+  repository: undefined         (IndexedDB)
+  logSource: undefined
+
+ErrorsOptions
+  enabled: true
+  maxRecords: 500               integer, must be > 0
+  retentionDays: 7              0 allowed (= no age cutoff)
+  maxPayloadBytes: 16384        integer, must be > 0
+  maxEventsPerMinute: 120       0 allowed (= unlimited), integer, 60s fixed window
+  allowedQueryParams: []        falls through to redaction.allowedQueryParams
+  preventDefaultUnhandledRejection: false
+  captureResources: false
+  captureCsp: false
+  captureChunkErrors: true
+  beforeCapture: undefined      (record: ErrorRecord) => ErrorRecord | null
+
+LogsOptions
+  enabled: true
+  level: 'warn'                 PERSIST threshold: trace|debug|info|warn|error|off (none/silent => 'off')
+  consoleLevel: undefined       CONSOLE threshold applied at init; undefined => leave the logger's own level.
+                                No default on purpose: initTelemetry never changes console output unless asked.
+                                destroyTelemetry() resets the console level to 'warn'.
+  maxRecords: 2000
+  retentionDays: 3
+  maxPayloadBytes: 4096
+  maxLogsPerMinute: 600
+  writeFlushMs: 1000            upper bound on how long a buffered log waits before being written
+                                (LOG_FLUSH_INTERVAL_MS); a write also fires at writeBatchSize entries
+  writeBatchSize: 50            buffered entries that trigger an immediate write, and the batch size
+                                of one IndexedDB transaction (LOG_FLUSH_BATCH_SIZE)
+  captureConsole: false         wraps console.warn + console.error only
+  beforeStore: undefined        (record: LogRecord) => LogRecord | null
+
+RedactionOptions
+  extraSensitiveKeys: []
+  extraPatterns: []
+  allowedQueryParams: undefined  (undefined => DEFAULT_ALLOWED_QUERY_PARAMS; setting it here OR
+                                 under errors sets BOTH; [] means keep NO query values at all,
+                                 which is NOT the same as leaving it unset)
+
+RestOptions
+  enabled: undefined            derived: true iff transport|errorsUrl|logsUrl supplied, else false
+  errorsUrl: undefined
+  logsUrl: undefined
+  intervalMs: 30000             delay after a successful run
+  batchSize: 50
+  credentials: 'same-origin'    omit|same-origin|include
+  getHeaders: undefined         awaited per request; throwing => retryable
+  transport: undefined          default createFetchTransport()
+  requireHttps: false
+  onTerminalFailure: undefined  (status, records: {id}[]) => void
+
+ShortcutOptions (resolved)
+  key: 'd'                      single letter -> Key<X>, digit -> Digit<N>
+  ctrl: true
+  shift: true
+  alt: true
+  meta: false
+  target: undefined             => document, then the global event target
+  allow: undefined              () => boolean; must return literal true
+  filenamePrefix: 'diagnostics-report'
+  onExported: undefined         (ok: boolean) => void
+
+DiagnosticsExportOptions
+  format: 'html'                'html' | 'json'
+  copyToClipboard: false
+  redactAgain: false
+  filenamePrefix: undefined     => shortcut.filenamePrefix, then 'diagnostics-report'
+  onExported: undefined
+
+## 3. OPTION PRECEDENCE
+
+explicit option > fromEnv layer > built-in default
+
+env resolution:
+  env absent/false/''/[]  -> no env layer
+  env true                -> DEFAULT_ENV_PREFIXES = ['VITE_','NEXT_PUBLIC_','REACT_APP_']
+  env 'PREFIX_'           -> that prefix only
+  env ['A_','B_']         -> those prefixes in order, first non-empty match wins
+
+logs.consoleLevel resolution: logs.consoleLevel ?? LOG_LEVEL ?? undefined (no default)
+logs.level resolution:        logs.level ?? LOG_PERSIST_LEVEL ?? TELEMETRY_PERSIST_LEVEL
+                              ?? TELEMETRY_LOG_LEVEL ?? LOG_LEVEL (documented inheritance) ?? 'warn'
+rest.enabled resolution:      rest.enabled ?? TELEMETRY_REST_ENABLED ?? (transport|errorsUrl|logsUrl ? true : false)
+every other numeric:          option ?? its environment variable ?? default
+                              (incl. openTimeoutMs ?? TELEMETRY_OPEN_TIMEOUT_MS ?? 5000,
+                               logs.writeFlushMs ?? LOG_PERSIST_WRITE_FLUSH_MS ?? 1000,
+                               logs.writeBatchSize ?? LOG_PERSIST_WRITE_BATCH_SIZE ?? 50)
+mode resolution:              options.mode ?? (rest.enabled ? 'remote' : 'local')
+                              (rest.enabled itself defaults to true iff transport|errorsUrl|logsUrl supplied,
+                               so configuring URLs and setting rest.enabled:false reports 'local')
+syncManager.enabled:          mode === 'remote' AND rest.enabled AND a valid endpoint resolved
+                              (an existing endpoint deliberately switched off emits NO mode-remote-without-endpoint note)
+
+INVALID VALUES ARE IGNORED (fall back to the default or the previous value)
+  numeric: non-number, NaN, +-Infinity => default. < 1 => default, unless allowZero.
+           allowZero is set for errors.retentionDays, errors.maxEventsPerMinute,
+           logs.retentionDays, logs.maxLogsPerMinute.
+           integer: Math.floor applied for maxRecords, maxPayloadBytes, maxEventsPerMinute,
+           logs.maxRecords, logs.maxPayloadBytes, logs.maxLogsPerMinute, rest.intervalMs, rest.batchSize,
+           openTimeoutMs, logs.writeFlushMs, logs.writeBatchSize.
+           allowZero is NOT set for openTimeoutMs, logs.writeFlushMs or logs.writeBatchSize, so 0 falls
+           back to the default (0 would mean "no wait" / "never write", never a useful intent).
+  string:  non-string, empty or whitespace-only (after trim) => default.
+  arrays:  non-array => []. Entries of the wrong type are filtered out.
+  level:   anything outside {trace,debug,info,warn,error,off,none,silent} => ignored (previous kept).
+  boolean: non-boolean => default. No string coercion (fromEnv parses 'true'/'1'/'yes'/'on').
+
+## 4. PUBLIC EXPORTS (src/index.ts) — signature :: description
+
+### Lifecycle
+initTelemetry(options?: TelemetryOptions): TelemetryHandle :: bootstrap; idempotent; never throws; second call returns the existing handle and installs nothing.
+destroyTelemetry(): void :: remove listeners+timers synchronously, then flush and close DBs async; idempotent; never throws.
+flushTelemetry(): Promise<void> :: wait for buffered writes and the pending-count snapshot; never rejects; does not upload.
+syncTelemetry(): Promise<FlushResult> :: flush then force one upload run; never rejects; concurrent calls share a run.
+retryFailedTelemetry(): Promise<number> :: move terminally-failed records back to pending, clear backoff, schedule immediately; returns how many moved.
+clearTelemetryData(): Promise<boolean> :: wipe every row in both stores; clears the pre-init buffer; true only if both clears succeeded; false if no repository.
+getTelemetryStatus(): TelemetryStatus :: synchronous snapshot; never throws.
+isTelemetryInitialized(): boolean :: whether initTelemetry completed and has not been destroyed.
+
+TelemetryHandle = { appName: string|undefined; pageLoadId: string; enabled: boolean; storage: StorageState; destroy(): void; flush(): Promise<void>; sync(): Promise<FlushResult> }
+TelemetryStatus = { initialized: boolean; mode: 'local'|'remote'; storage: 'initializing'|'ready'|'unavailable'|'disabled'; online: boolean; pending: {errors: number; logs: number}; droppedByRateLimit: number; lastSync: number|undefined; syncStatus: SyncStatus }
+SyncStatus = 'idle'|'running'|'offline'|'ok'|'retry'|'error'
+FlushResult = { errors: FlushSummary; logs: FlushSummary }
+FlushSummary = { claimed: number; uploaded: number; retried: number; failed: number; stopped: boolean }
+
+### Configuration
+resolveOptions(options?: TelemetryOptions): ResolvedTelemetryOptions :: resolve+validate+freeze; precedence applied; invalid numerics/levels ignored.
+databaseNames(dbPrefix: string): { errors: string; logs: string } :: `${dbPrefix}-errors`, `${dbPrefix}-logs`.
+DEFAULT_OPTIONS :: { enabled: true, dbPrefix: 'rm-logvault', errors: {...}, logs: {...}, rest: {...} } (see §2).
+Exported option types: TelemetryOptions, ErrorsOptions, LogsOptions, RedactionOptions, RestOptions, ShortcutOptions, ResolvedTelemetryOptions, ResolvedErrorsOptions, ResolvedLogsOptions, ResolvedRedactionOptions, ResolvedRestOptions, ResolvedShortcutOptions.
+
+### Environment
+fromEnv(prefix?: string | readonly string[]): EnvOptions :: build options from env vars; never throws.
+DEFAULT_ENV_PREFIXES: readonly string[] = ['VITE_','NEXT_PUBLIC_','REACT_APP_']
+isBrowser(): boolean :: window and document both present.
+getGlobal(key: string): unknown :: read from globalThis without throwing.
+safeGet(target: unknown, key: string): unknown :: read a property without triggering hostile getters.
+EnvOptions = { appName?, appVersion?, buildId?, environment?, enabled?, dbPrefix?, openTimeoutMs?,
+  errorsEnabled?, errorsRetentionDays?, errorsMaxRecords?, errorsMaxPayloadBytes?, errorsMaxEventsPerMinute?,
+  logsEnabled?, consoleLevel?, persistLevel?, logLevel?, logsRetentionDays?, logsMaxRecords?,
+  logsMaxPayloadBytes?, logsMaxLogsPerMinute?, logsWriteFlushMs?, logsWriteBatchSize?,
+  restEnabled?, errorsUrl?, logsUrl?, restIntervalMs?, restBatchSize? }
+
+Env var suffixes (prefixed by VITE_ | NEXT_PUBLIC_ | REACT_APP_):
+  APP_NAME->appName, APP_VERSION->appVersion, BUILD_ID->buildId,
+  APP_ENV->environment (fallback ENVIRONMENT), TELEMETRY_ENABLED->enabled,
+  TELEMETRY_DB_PREFIX->dbPrefix, TELEMETRY_OPEN_TIMEOUT_MS->openTimeoutMs,
+  ERROR_TRACKING_ENABLED->errorsEnabled, ERROR_TRACKING_RETENTION_DAYS->errorsRetentionDays,
+  ERROR_TRACKING_MAX_RECORDS->errorsMaxRecords, ERROR_TRACKING_MAX_PAYLOAD_BYTES->errorsMaxPayloadBytes,
+  ERROR_TRACKING_MAX_EVENTS_PER_MINUTE->errorsMaxEventsPerMinute,
+  LOG_PERSIST_ENABLED->logsEnabled, LOG_LEVEL->consoleLevel, LOG_PERSIST_LEVEL->persistLevel,
+  LOG_PERSIST_RETENTION_DAYS->logsRetentionDays, LOG_PERSIST_MAX_RECORDS->logsMaxRecords,
+  LOG_PERSIST_MAX_PAYLOAD_BYTES->logsMaxPayloadBytes,
+  LOG_PERSIST_MAX_LOGS_PER_MINUTE->logsMaxLogsPerMinute,
+  LOG_PERSIST_WRITE_FLUSH_MS->logsWriteFlushMs, LOG_PERSIST_WRITE_BATCH_SIZE->logsWriteBatchSize,
+  ERROR_TRACKING_REST_URL->errorsUrl, LOG_TRACKING_REST_URL->logsUrl,
+  TELEMETRY_REST_ENABLED->restEnabled, TELEMETRY_SYNC_INTERVAL_MS->restIntervalMs,
+  TELEMETRY_SYNC_BATCH_SIZE->restBatchSize
+legacy aliases (still read; the specific name wins when both are set):
+  TELEMETRY_ERRORS_ENABLED->errorsEnabled, TELEMETRY_LOGS_ENABLED->logsEnabled,
+  TELEMETRY_PERSIST_LEVEL->persistLevel, TELEMETRY_LOG_LEVEL->logLevel (PERSIST only, never console),
+  TELEMETRY_ERRORS_URL->errorsUrl, TELEMETRY_LOGS_URL->logsUrl
+env parsing: absent/empty/whitespace == not set. number: non-number, NaN, Infinity or negative => undefined
+  (the option then falls back to its default); 0 is preserved; integers are floored except retentionDays
+  (fractional days allowed, 0.5 == 12h). An empty LOG_PERSIST_LEVEL therefore inherits LOG_LEVEL.
+Booleans: true/1/yes/on and false/0/no/off, trimmed + lowercased; anything else ignored.
+
+### Logger
+logger: Logger :: the shared facade.
+createLogger(): LoggerController :: isolated controller (logger, replayPreInit, bufferedCount, setConsoleCapture, emitInternal, reset).
+Logger = { trace|debug|info|warn|error(message: string, ...args: readonly unknown[]): void; addSink(sink: LogSink): () => void; setLevel(level: LogLevelSetting): void; setEnabled(enabled: boolean): void; getConfig(): {level: LogLevelSetting; enabled: boolean} }
+LogSink = { name?: string|undefined; write(record: LogRecord): void }
+LogLevel = 'trace'|'debug'|'info'|'warn'|'error'
+LogLevelSetting = LogLevel | 'off'
+LOG_LEVELS = ['trace','debug','info','warn','error']
+LOG_LEVEL_PRIORITY = { trace:10, debug:20, info:30, warn:40, error:50 }
+levelPriority(level: LogLevelSetting): number :: 'off' => Infinity.
+meetsLevel(actual: LogLevel, threshold: LogLevelSetting): boolean :: false when threshold==='off'.
+
+Record routing: the destination depends on the API called, NOT the level. logger.* and captured console.* produce a LogRecord -> `${dbPrefix}-logs` store 'logs', at every level (logger.error is a LOG record with level 'error'). Only captureError, the framework adapters and the global handlers produce an ErrorRecord -> `${dbPrefix}-errors` store 'errors'. The two are not interchangeable: ErrorRecord carries fingerprint/severity/category/handled/occurrenceCount/firstSeen/lastSeen and aggregates repeats into one pending row, while LogRecord carries level/message/data/route/seq and is appended one row per call.
+Log call shape: logger.<level>(message, ...args). message is scrubbed as free text and capped at MAX_LOG_MESSAGE_LENGTH (1000); up to MAX_LOG_ARGS (5) args are deep-scrubbed by sanitizeValue and stored as the record's `data` array.
+A message starting with a RESERVED_LOG_PREFIXES entry ('[ErrorTracking]'|'[LogTracking]'|'[Telemetry]'|'[DiagnosticsExport]') is never persisted — console only, by design.
+undefined and null both store as null, so a missing property is indistinguishable from an explicit null; encode the difference explicitly if it matters.
+A function stores as the literal '[Function]'; log fn.name instead. A sensitive key (SENSITIVE_KEY_PATTERN) stores '[REDACTED]' regardless of value.
+Oversize log records are reduced in this order: drop `data`, then shorten `message` to 300 chars (LOG_REDUCED_MESSAGE_LENGTH), then drop the record. Default budget logs.maxPayloadBytes = 4096.
+Value caps inside one record: MAX_DEPTH 4 -> '[MaxDepth]', MAX_KEYS 30 -> '…' overflow entry, MAX_ARRAY_ITEMS 20 -> '[+N]', MAX_STRING_LENGTH 2000 truncated with length suffix, cycle -> '[Circular]'.
+
+### Error capture
+captureError(error: unknown, ctx?: ErrorContext): void :: the single ingestion point; never throws; pre-init buffered (50).
+captureApiError(error: unknown, startedAt?: number): void :: axios-shaped failure; source 'api'; allow-listed fields only.
+captureFetchError(request: FetchRequestInfo, failure: FetchFailure): void :: failed fetch; source 'api'.
+withErrorCapture<T>(handler: () => T, ctx?: ErrorContext): T :: capture then re-throw the SAME value; default source 'event-handler'.
+Types: ErrorContext, ErrorRecord, ErrorSource, ErrorSeverity, ErrorCategory, ApiErrorContext, ApiErrorKind, ErrorCause, ErrorLocation, ThrownType.
+
+ErrorSource = 'react'|'vue'|'angular'|'svelte'|'api'|'window'|'unhandledrejection'|'resource'|'chunk'|'csp'|'event-handler'|'worker'|'query'|'storage'|'manual'
+ErrorSeverity = 'fatal'|'error'|'warning'|'info'
+ErrorCategory = 'runtime'|'chunk'|'resource'|'http'|'network'|'timeout'|'abort'|'parse'|'auth'|'security'
+ThrownType = 'error'|'string'|'number'|'boolean'|'object'|'null'|'undefined'|'other'
+ApiErrorKind = 'auth'|'abort'|'timeout'|'parse'|'http'|'network'|'unknown'
+
+Adapter captures are ERROR records. Every @codewithrajat/rm-logvault/<framework> adapter funnels into captureError, so its output is written to `${dbPrefix}-errors` store 'errors' with that adapter's source ('react'|'vue'|'angular'|'query'), never to the logs store.
+A throw handled by a framework ErrorHandler and a logger.* call are independent records: the throw neither suppresses the earlier call nor carries it, and an ErrorRecord contains no breadcrumb of preceding logs. Attach context with ctx.tags / ctx.extra at the capture site.
+console.warn/console.error are captured only when logs.captureConsole is true; console.log/console.info never are.
+logger.setLevel sets console verbosity only; logs.level (default 'warn') is the independent persist threshold.
+Known defect, 1.0.0 only, fixed in 1.0.1: every adapter subpath bundle inlined the core, so its copy of captureError held a tracker that could never be installed (setErrorTracker is reachable only from initTelemetry, in the root entry). Rollup compiled the dispatch away, so everything captured through a subpath adapter was buffered and discarded with no [Telemetry] output — failing without failing anything. captureError imported from the root entry was unaffected. See DECISIONS.md D-026.
+A failed error-record write is reported through reportInternalFailure stage 'error-persist' (reason is the StorageFailureReason: 'unavailable'|'quota'|'serialization'|'transaction'). The log tracker's equivalent stage is 'persist'. Each stage is emitted once per initialization, which is why they are named separately. A store that opened and then refused a write leaves getTelemetryStatus().storage reading 'ready' — the 'error-persist' line is the only signal.
+
+### Normalisation / classification / fingerprint
+normalizeError(input: unknown): NormalizedError :: anything -> NormalizedError; never throws; fallback UNNORMALIZABLE.
+sanitizeNormalized(normalized: NormalizedError): NormalizedError :: re-scrub an already-normalised value.
+UNNORMALIZABLE: NormalizedError = { name:'Error', message:'Unnormalizable error value', thrownType:'other', isChunkError:false, isCrossOrigin:false, category:'runtime' }
+buildApiErrorContext(error: unknown, startedAt?: number): ApiClassification :: kind order auth>abort>timeout>parse>http>network>unknown.
+buildFetchErrorContext(request: FetchRequestInfo, failure: FetchFailure): ApiClassification :: status 0 or absent response => 'network'.
+categoryForKind(kind: ApiErrorKind): ErrorCategory
+severityForKind(kind: ApiErrorKind, status: number|undefined): ErrorSeverity :: abort=>info, auth=>warning, http<500=>warning, else error.
+markAuthError<T>(error: T): T :: tags the error with the non-enumerable flag _isTokenFetchError; returns the same object.
+isAuthError(error: unknown): boolean
+CORRELATION_HEADERS = ['x-request-id','x-correlation-id','x-trace-id','traceparent']
+FingerprintInput = { source; category; name; message; stack?; componentStack?; route?; api?: Pick<ApiErrorContext,'kind'|'method'|'url'|'status'>; event?: Pick<ErrorEventInfo,'type'|'resourceUrl'|'directive'>; location? }
+fetch request/failure: FetchRequestInfo = { method?; url?; startedAt? }; FetchFailure = { error?; response?; timedOut? }
+ApiClassification = { api: ApiErrorContext; category: ErrorCategory; severity: ErrorSeverity }
+
+### Fingerprinting
+fingerprint(input: FingerprintInput): string :: 28 lowercase hex chars (2x cyrb53 with seeds 1 and 2); 'unfingerprinted-...' on failure.
+fingerprintParts(input: FingerprintInput): string[] :: ordered parts: source, category, name, message, top5 stack frames, top3 component frames, normalised route, api(kind,method,url,status), event(type,resourceUrl,directive), location (only when no stack).
+normalizePathForFingerprint(input: string|undefined): string :: drop query+fragment; numeric/UUID/long-hex segments -> ':id'.
+topStackFrames(stack: string|undefined, count: number): string :: frames joined with '|'; recognises 'at ' and 'fn@url'.
+cyrb53(input: string, seed?: number): number :: 53-bit hash in [0, 2^53).
+FINGERPRINT_STACK_FRAMES = 5; FINGERPRINT_COMPONENT_FRAMES = 3 (internal)
+
+### Sanitisation
+createSanitizer(config?: SanitizerConfig): Sanitizer :: never throws; fails closed.
+sanitizeText(input: unknown, maxLength?: number): string :: default 2000; returns '[REDACTED]' on failure.
+sanitizeUrl(input: unknown, maxLength?: number): string|undefined :: default 2000; undefined for non-string/empty.
+sanitizeStack(input: unknown, maxLength?: number): string :: default 8000; drops Vite ?t=/?v= cache busters first.
+sanitizeValue(input: unknown, key?: string): unknown :: bounded deep scrub; JSON-safe; never throws.
+isSensitiveKey(key: string): boolean :: fails closed (true) if the check throws.
+getDefaultSanitizer(): Sanitizer :: the sanitizer in force (replaced by initTelemetry from options.redaction).
+SanitizerConfig = { extraSensitiveKeys?: readonly (string|RegExp)[]; extraPatterns?: readonly RegExp[]; allowedQueryParams?: readonly string[] }
+Sanitizer = { text(input, maxLength?): string; stack(input, maxLength?): string; url(input, maxLength?): string|undefined; value(input, key?): unknown; isSensitiveKey(key: string): boolean }
+
+sanitizeValue output for special values:
+  null -> null; undefined -> null; function -> '[Function]'; symbol -> String(sym); bigint -> String(v)
+  non-finite number -> String(v); Date -> ISO string or 'Invalid Date'
+  Error-like -> { name, message } (both scrubbed)
+  Event -> '[Event <type>]'; Element -> '[Element <tag>]'
+  cycle -> '[Circular]'; depth > 4 -> '[MaxDepth]'
+  keys > 30 -> extra '…' key with '[+N keys]'; array/Set > 20 -> extra '[+N]'
+  unreadable property -> '[Unserializable]'; whole-walk failure -> '[Unserializable]'
+  keys __proto__, constructor, prototype are skipped
+  objects built with Object.fromEntries (own data properties; prototype-pollution safe)
+
+### Constants (exported)
+REDACTED = '[REDACTED]'
+SENSITIVE_KEY_PATTERN = /(authorization|cookie|token|password|passwd|pwd|secret|apikey|accesskey|privatekey|credential|session|signature|bearer|otp|^auth$|email|phone)/
+  matched against key.toLowerCase().replace(/[-_\s]/g,'')
+DEFAULT_ALLOWED_QUERY_PARAMS = ['limit','offset','page','pageSize','size','sort','order','scope','lng','lang','type']
+MAX_DEPTH = 4
+MAX_KEYS = 30
+MAX_ARRAY_ITEMS = 20
+MAX_STRING_LENGTH = 2000
+MAX_MESSAGE_LENGTH = 1000
+MAX_STACK_LENGTH = 8000
+MAX_COMPONENT_STACK_LENGTH = 4000
+MAX_CAUSE_DEPTH = 3
+MAX_TAGS = 20
+MAX_LOG_ARGS = 5
+UNHANDLED_SOURCES = Set{'window','unhandledrejection','resource','chunk','csp','worker'}  (handled = !has(source))
+
+### Global handlers
+installGlobalErrorHandlers(options: GlobalHandlerOptions): () => void :: chained onerror + unhandledrejection + vite:preloadError; optional resource (capture phase) and CSP; merges registrations.
+globalHandlerCount(): number
+globalHandlersAttached(): boolean
+GlobalHandlerOptions = { onError(error: unknown, ctx: ErrorContext): void; preventDefaultUnhandledRejection?: boolean; captureResources?: boolean; captureCsp?: boolean; captureChunkErrors?: boolean }
+
+### Diagnostics export
+exportDiagnosticsReport(options?: DiagnosticsExportOptions): Promise<DiagnosticsExportResult> :: flush, read ALL records, render, download or copy; never rejects.
+  DiagnosticsExportResult = { ok: boolean; format: DiagnosticsFormat; bytes: number }
+  BREAKING (was Promise<boolean>): `if (await exportDiagnosticsReport())` still works, since the object is truthy.
+  ok is false outside a browser, with no repository, or on a concurrent call (the in-flight guard).
+  DiagnosticsExportOptions = { format?: 'html'|'json'|'jsonl'|'csv' = 'html'; copyToClipboard?; pretty?: boolean = false;
+                                redactAgain?; filenamePrefix?; onProgress?: (processed, total) => void; onExported?: (ok) => void }
+  'pretty' applies to 'json' ONLY — it is ignored by 'jsonl', where an indented object would break one-record-per-line.
+  onProgress fires once per EXPORT_SLICE_SIZE records and once at the end; a throwing callback is contained.
+  'jsonl' emits `{"kind":"error",...}` / `{"kind":"log",...}`, one compact object per line, '\n' separated.
+  'csv' emits ONE table for both kinds, distinguished by a leading `kind` column, CRLF line endings, RFC 4180 quoting.
+    FORMULA INJECTION IS NEUTRALISED: a cell starting with = + - @, tab or CR is prefixed with an apostrophe, because
+    Excel/Sheets/LibreOffice execute such a cell on open and an error message is attacker-influenced input.
+installDiagnosticsExportShortcut(options?: DiagnosticsShortcutOptions | false): () => void
+installShortcut(config: Partial<ShortcutConfig>|undefined, onTrigger: () => void): () => void :: capture-phase keydown listener; returns cleanup.
+matchesShortcut(event: KeyboardEvent, config: ShortcutConfig): boolean :: exact modifier match; code first, key fallback.
+expectedCode(key: string): string|undefined :: 'd'->'KeyD', '7'->'Digit7', else undefined.
+isEditableTarget(target: EventTarget|null|undefined): boolean :: input/textarea/select/contenteditable.
+isExportInFlight(): boolean :: in-flight guard.
+diagnosticsFilename(prefix: string, extension: string): string :: `${prefix}-${ISO with : and . replaced by -}.${extension}`
+renderDiagnosticsReport(meta: ReportMeta, errors, logs, encodedPayload?: string): string :: complete self-contained HTML.
+buildReportPayload(meta, errors, logs): ReportPayload
+escapeHtml(value: string): string :: & < > " '
+escapeJsonText(json: string): string :: < > & U+2028 U+2029 -> \uXXXX
+encodeJsonForHtml(value: unknown): string :: JSON.stringify then escapeJsonText; unstringifiable -> 'null'.
+REPORT_PRIVACY_BANNER = 'This report may contain personal data (page URLs, browser details, application messages). Review before sharing.'
+sanitizeErrorRecord(record: ErrorRecord): ErrorRecord :: second-pass redaction; returns the record unchanged if it throws.
+sanitizeLogRecord(record: LogRecord): LogRecord :: same.
+DiagnosticsFormat = 'html' | 'json' | 'jsonl' | 'csv'
+DIAGNOSTICS_CSV_COLUMNS = ['kind','id','timestamp','severity','source','category','name','message','occurrenceCount','fingerprint','route','method','url','status']
+  Errors and logs share these columns and leave the inapplicable ones empty, so the file can be sorted and pivoted in one sheet.
+DiagnosticsShortcutOptions = Partial<ShortcutConfig> & { filenamePrefix?; exportOptions?: DiagnosticsExportOptions; onExported? }
+ShortcutConfig = { key: string; ctrl: boolean; shift: boolean; alt: boolean; meta: boolean; target?: EventTarget; allow?: () => boolean }
+ReportMeta = { generatedAt: string; appName: string; appVersion: string; buildId: string; environment: string; url: string; userAgent: string; online: boolean; errorCount: number; logCount: number }
+ReportPayload = { schemaVersion: number; generatedAt: string; app: {appName,appVersion,buildId,environment}; page: {url,userAgent,online}; errors: ErrorRecord[]; logs: LogRecord[] }
+EXPORT_SLICE_SIZE = 500
+
+### Events (observation)
+createEventEmitter(): EventEmitter :: a fresh emitter. initTelemetry exposes one as handle.events.
+  handle.events is a STABLE wrapper, not the per-installation emitter: the same object is returned by every
+  initTelemetry call, so a reference captured once keeps observing across a destroy/re-init cycle. Before init and
+  after teardown, subscriptions land on a dormant emitter, so a listener registered at module load is not lost.
+  TelemetryEventType = 'error:captured' | 'log:written' | 'sync:started' | 'sync:completed' | 'sync:failed' | 'record:dropped'
+  EventEmitter = { on(type, listener): () => void; onAny(listener): () => void; off(type, listener): void;
+                   emit(event): void; listenerCount(type?): number; clear(): void }
+  Every listener runs in its own try/catch, so a throwing subscriber cannot stop the capture that notified it.
+  An async listener's rejection is observed and routed to reportInternalFailure — never an unhandled rejection.
+  Nested emission (a listener that emits) is QUEUED, not recursed, and the drain replaces the pending slot rather
+  than appending, so a listener that emits on every event terminates instead of spinning.
+  Payloads: ErrorCapturedEvent { recordId, fingerprint, severity, source, category, handled, occurrenceCount }
+            LogWrittenEvent { recordId, level, message }   (message is ALREADY sanitized)
+            SyncStartedEvent { kind, recordCount }         SyncCompletedEvent { kind, uploaded, retried, failed }
+            SyncFailedEvent { kind, status, recordCount }  RecordDroppedEvent { kind, reason, count }
+  HONEST SCOPE: these report captureError and logger activity plus explicit syncTelemetry() runs. The automatic
+  background flush is internal and does NOT emit sync:started / sync:completed. destroyTelemetry clears listeners.
+
+### Error context builders (extension)
+registerErrorContextBuilder(builder: ErrorContextBuilder): () => void :: register; a duplicate `name` REPLACES the previous one.
+unregisterErrorContextBuilder(name: string): boolean
+clearErrorContextBuilders(): void :: intended for tests and for swapping classification wholesale.
+listErrorContextBuilders(): readonly ErrorContextBuilder[]  ;  errorContextBuilderCount(): number
+resolveErrorContext(error: unknown, ctx?: ErrorContext): ErrorContext :: never throws; returns ctx ?? {} when nothing is registered.
+ErrorContextBuilder = { name: string; canHandle(error, ctx?): boolean; build(error, ctx?): ErrorContext | null }
+  Resolution is REGISTRATION ORDER and the first match wins; register specific classifiers before general ones.
+  MERGE RULE: the caller's explicit fields ALWAYS beat the builder's — a builder cannot override source on an explicit
+  captureError(err, { source: 'react' }). `tags` and `extra` are the exception: they merge KEY-BY-KEY with the caller
+  winning on a conflict, because those two are additive by nature and discarding either would lose information silently.
+  The registry is PROCESS-WIDE and SURVIVES destroyTelemetry: it describes the application, not an installation.
+  A throwing canHandle counts as "no match"; a throwing build falls through to the next builder.
+  captureError applies builders before building the record, so a builder-supplied category/severity/tag is
+  indistinguishable in the output from one the caller passed.
+installBuiltinContextBuilders(): () => void :: registers timeout -> http -> type-error, and returns ONE unregister fn.
+httpErrorContextBuilder | timeoutErrorContextBuilder | typeErrorContextBuilder
+  NOTHING SELF-REGISTERS. Importing the module has no effect, so upgrading the library cannot silently reclassify
+  an existing application's errors. Order matters: `timeout` is first because a timed-out request can also look like
+  an HTTP failure and 'timeout' is the more useful label; `type-error` is last so it cannot shadow either.
+  timeout matches code ETIMEDOUT/ECONNABORTED or a timeout-shaped message.
+  http matches a response object with a numeric status, or a numeric status/statusCode. Reads only the allow-list.
+  type-error matches a TypeError, including cross-realm ones (checked by constructor name).
+
+### Logger sinks
+getSinkRegistry(): SinkRegistry :: the registry behind the module-level `logger`. Inspection and keyed removal only.
+createSinkRegistry(): SinkRegistry
+SinkRegistry = { register(key, sink): () => void; unregister(key): boolean; get(key): LogSink | undefined; has(key): boolean;
+                 list(): readonly SinkRegistration[]; keys(): readonly string[]; size(): number; write(record): void; clear(): void }
+SinkRegistration = { key: string; name: string | undefined; sink: LogSink }
+  logger.addSink(sink) remains THE installation API; registering directly in the registry would bypass pre-init
+  replay and the re-entrancy guard. addSink generates the key `${sink.name ?? 'sink'}#${n}` — the sequence suffix is
+  what keeps two sinks that declare the same name from replacing each other. Re-registering an existing key replaces
+  that sink and returns a fresh unsubscribe fn; an older unsubscribe fn is safe to call and does not remove the replacement.
+
+### Adapter descriptors
+ADAPTERS: readonly AdapterDescriptor[] :: a FROZEN CONSTANT, not a runtime registry. 9 entries; key/framework/entryPoint/inCore/targets/exports/description/kind.
+adapterFor(key: string): AdapterDescriptor | undefined  ;  adapterFrameworks(): readonly string[]  (sorted, includes 'core')
+AdapterKind = 'framework' | 'http-client' | 'storage' | 'transport'
+  A runtime self-registering Map was REJECTED: it reports [] for every adapter the application did not happen to
+  import, so it answers the question wrong in the common case, and it costs bundle size for build-time-constant
+  information. ADAPTERS is annotated /* @__PURE__ */ so it tree-shakes away when unread — load-bearing, because its
+  `framework` fields are the literal strings 'react', 'vue' and 'axios' and without the annotation the
+  size:consumers peer tripwire reports bundled peers that were never bundled.
+
+### Storage
+createErrorRepository(options: ErrorRepositoryOptions): ErrorRepository :: IndexedDB-backed; construction never opens the DB.
+createLogRepository(options: LogRepositoryOptions): LogRepository
+createDbConnection(options: IdbCoreOptions): DbConnection
+classifyStorageError(error: unknown): StorageFailureReason :: quota | serialization | transaction.
+promisifyRequest<T>(request: IDBRequest<T>): Promise<T>
+isErrorRecord(value: unknown): value is ErrorRecord
+isLogRecord(value: unknown): value is LogRecord
+ErrorRepositoryOptions = { dbName: string; indexedDB?: IDBFactory; onFailure?: (reason, error) => void; cleanupPolicy?: CleanupPolicy; cleanupEveryWrites?: number; openTimeoutMs?: number }
+IdbCoreOptions = { dbName; version; storeName; upgrade(db, oldVersion, tx): void; openTimeoutMs?; indexedDB?; onFailure? }
+DbConnection = { dbName; storeName; version; isOpen(): boolean; ensureOpen(); transaction(mode, work); deleteDatabase(); close() }
+CleanupPolicy = { retentionDays: number; maxRecords: number }
+StorageFailureReason = 'unavailable'|'quota'|'serialization'|'transaction'
+StorageResult<T> = Result<T, StorageFailureReason>
+StorageState = 'initializing'|'ready'|'unavailable'|'disabled'
+  'initializing' = initTelemetry returned but the IndexedDB readiness promise has not settled;
+  await flushTelemetry() settles it.
+ErrorRepository: initialize, save(record), get(id), getAll(), getPending(limit?), claimPending(limit, now), requeueStale(olderThanMs, now), getFailed(), delete(ids), updateUploadStatus(ids, status), count(), pendingCount(), cleanup(policy), clear(), close()
+LogRepository: same, with saveBatch(records) instead of save(record)
+TelemetryRepository = { errors: ErrorRepository; logs: LogRepository; initialize(); close() }
+pendingCount() counts 'pending' PLUS 'uploading'.
+
+### Sync
+createSyncManager(options: SyncManagerOptions): SyncManager
+createFetchTransport(options?: FetchTransportOptions): RemoteTransport :: the only network egress.
+resolveEndpoint(raw: string|undefined, requireHttps: boolean): string|undefined
+resolveEndpoints(options: ResolvedTelemetryOptions): { errorsUrl: string|undefined; logsUrl: string|undefined }
+isSyncConfigured(options: ResolvedTelemetryOptions): boolean
+classifyResponse(status: number): ResponseOutcome :: ok | terminal | retryable.
+buildRestBody(kind: RecordKind, records: readonly unknown[], options: ResolvedTelemetryOptions, sentAt: number): RestBatchBody
+backoffDelay(failureCount: number): number :: min(15000 * 2^(failures-1), 900000); 0 for <=0.
+parseRetryAfter(value: string|null|undefined): number|undefined :: delta-seconds or HTTP-date; clamped [0, 900000].
+TERMINAL_STATUSES = Set{400,401,403,404,405,410,413,415,422}
+SyncManagerOptions = { errors: ErrorRepository|null; logs: LogRepository|null; options: ResolvedTelemetryOptions; isStorageReady: () => boolean }
+SyncManager = { start(); stop(); flush(keepalive?): Promise<FlushResult>; notifyNewRecords(); status(): SyncStatus; lastSync(): number|undefined; retryFailed(): Promise<number>; isEnabled(): boolean; dispose(): void }
+FetchTransportOptions = { timeoutMs?: number; fetchImpl?: typeof fetch }
+RemoteTransport = { name?: string; send(request: TransportRequest): Promise<TransportResponse> }
+TransportRequest = { url: string; headers: Readonly<Record<string,string>>; credentials: RequestCredentials; body: string; timeoutMs: number; keepalive: boolean; kind: RecordKind }
+TransportResponse = { status: number; retryAfterMs?: number }
+RestBatchBody = { schemaVersion: 1; kind: 'errors'|'logs'; sentAt: number; app: { appName: string; appVersion: string; buildId: string; environment: string }; records: readonly unknown[] }
+ResponseOutcome = 'ok'|'terminal'|'retryable'
+RecordKind = 'errors'|'logs'
+
+### Payload budgeting
+byteLength(value: unknown): number :: UTF-8 bytes of JSON.stringify; Infinity when unserialisable.
+reduceErrorPayload(record: ErrorRecord, maxBytes: number): ErrorRecord|null :: tiers: 0 unchanged (if fits) -> 1 drop extra + tag truncated:'true' -> 2 causes<=300, stack<=2000, componentStack<=1000 -> 3 stack<=500, message<=300, causes+componentStack removed -> 4 null.
+reduceLogPayload(record: LogRecord, maxBytes: number): LogRecord|null :: tiers: 0 unchanged -> 1 drop data -> 2 message<=300 -> 3 null.
+TRUNCATED_TAG='truncated'; TIER1_CAUSE_LENGTH=300; TIER1_STACK_LENGTH=2000; TIER1_COMPONENT_STACK_LENGTH=1000; TIER2_STACK_LENGTH=500; TIER2_MESSAGE_LENGTH=300; LOG_REDUCED_MESSAGE_LENGTH=300 (internal)
+
+### Observability internals
+reportInternalFailure(stage: string, error: unknown): void :: reported once per stage per init; emits '[Telemetry] <stage> failed: ...' and calls onInternalError.
+reportInternalNote(stage: string, detail: string): void :: same once-per-stage suppression.
+getState(): TelemetryState :: the globalThis[Symbol.for('logvault@1')] singleton.
+newId(): string :: randomUUID -> getRandomValues hex -> time36-counter36-random36 -> fallback.
+newPageLoadId(): string
+createRateLimiter(maxPerWindow: number, onWindowRoll?: (dropped: number) => void): RateLimiter :: fixed 60s window; maxPerWindow<=0 disables limiting; fails open.
+createSerialQueue(): SerialQueue :: push/drain/size/clear; strict order; a failing task never poisons the chain.
+RateLimiter = { allow(): boolean; dropped(): number; admitted(): number; reset(): void }
+SerialQueue = { push<T>(task): Promise<T|undefined>; drain(): Promise<void>; size(): number; clear(): void }
+TelemetryState = { __logvaultState: true; initialized; options; repository; storageState; pendingErrors; pendingLogs; pageLoadId; teardown; flush; retryFailed; cleanup }
+
+## 5. SUBPATH ADAPTERS
+
+@codewithrajat/rm-logvault/react
+  TelemetryErrorBoundary (class extends Component) props: { children?; fallback?: ReactNode | ((error: Error, reset: () => void) => ReactNode); onError?: (error, info) => void; context?: ErrorContext }
+  reactRootErrorHandlers(context?: ErrorContext): ReactRootErrorHandlers
+    onUncaughtError -> source 'react', severity 'fatal', componentStack
+    onCaughtError   -> source 'react', handled true, componentStack
+    onRecoverableError -> source 'react', severity 'warning', handled true, tags.recoverable='true'
+  useErrorCapture(context?: ErrorContext): (error: unknown, extra?: ErrorContext) => void
+  All three funnel into captureError; identity dedup prevents double records.
+
+@codewithrajat/rm-logvault/vue
+  attachVueTelemetry(app: App, options?: { context?: ErrorContext; captureWarnings?: boolean = true }): void
+    chains app.config.errorHandler (extra.vueInfo = Vue's info string) and app.config.warnHandler (severity 'warning', handled true, tags {framework:'vue', kind:'warning'}, extra.vueTrace).
+  createTelemetryVuePlugin(options?): { install(app: App): void }
+
+@codewithrajat/rm-logvault/angular
+  TelemetryErrorHandler implements ErrorHandler { constructor(context?: ErrorContext); handleError(error: unknown): void }  -> captures then delegates to console.error.
+  provideTelemetryErrorHandler(context?: ErrorContext): Provider  -> { provide: ErrorHandler, useFactory: () => new TelemetryErrorHandler(context) }  (useFactory, so no decorator-metadata flags needed)
+  getPreviousErrorHandler(injector: { get(token, notFoundValue?): unknown }): ErrorHandler | undefined
+
+@codewithrajat/rm-logvault/axios
+  attachAxios(instance: AxiosInstance): () => void
+    response interceptor; reads method,url,status,statusText,code,timeout,duration,first correlation header; re-throws the original rejection unchanged.
+    startedAt = Date.now() - (config.timeout ?? 0) when timeout > 0, else undefined.
+
+@codewithrajat/rm-logvault/fetch
+  instrumentFetch(options?: { captureNetworkErrors?: boolean = true; captureNon2xx?: boolean = true; fetchImpl?: typeof fetch }): () => void
+    wraps globalThis.fetch; never reads bodies; returns the original Response; skips the library's own endpoints.
+  registerTelemetryUrl(url: string): () => void
+
+@codewithrajat/rm-logvault/react-query
+  attachQueryClient(queryClient: QueryClient): () => void
+    chains QueryCache.config.onError and MutationCache.config.onError; source 'query', category 'network', tags {kind:'query'|'mutation', queryKey|mutationKey}.
+
+@codewithrajat/rm-logvault/testing
+  createMemoryRepository(options?: { failWith?: StorageFailureReason; quotaAt?: number }): MemoryRepository
+    Adds errors.all(), logs.all(), errors.reset(), logs.reset(), reset(). Mirrors IndexedDB semantics exactly.
+  createFakeTransport(options?: { status?: number | ((request, index) => number); retryAfterMs?: number; failTimes?: number; onSend?: (request, index) => void }): FakeTransport
+    Adds requests, sendCount, lastBody(), reset(). Default status 202. failTimes rejects (transport failure). A throwing status function yields 500.
+
+@codewithrajat/rm-logvault/http
+  The HTTP client contract and its fetch implementation. NOTE: this is the ONE public surface that
+  may reject by design (an HTTP client that cannot report a failure is useless). Nothing in
+  core/errors/storage/sync/export imports it, so the never-throw guarantee elsewhere is unaffected.
+  Types: HttpClient, HttpClientOptions, HttpError, NonRetryableHttpError, HttpInterceptor, HttpMethod,
+         HttpRequest, HttpResponse, AuthProvider, AuthHeaderProvider, AuthHeaderProviderOptions
+  createFetchHttpClient(options?: HttpClientOptions): HttpClient
+    options: baseUrl; timeoutMs = 30000 (per ATTEMPT, not per call); headers; getHeaders?: () => Record<string,string> | Promise<...>
+             (awaited per request, merged LAST so a rotated token wins); bodyMode 'json'|'text'|'raw' = 'json';
+             readAs 'auto'|'json'|'text'|'arrayBuffer'|'blob'|'none' = 'auto' ('none' never reads the body);
+             credentials = 'same-origin'; retry = 0; retryDelayMs = 300; rejectOnHttpError = true;
+             onError?: (error: HttpError, context: ErrorContext) => void; fetchImpl?: typeof fetch
+    HttpClient methods: request<T>(req); get/post/put/patch/delete(url, body?, opts?); setInterceptors(list); getInterceptors()
+    Retry attempts = 1 + retry. Retried statuses: 0, 408, 429, all 5xx. Backoff min(base * 2^(n-1), 30000).
+    HttpError: extends Error, name 'HttpError'; request; response?; isNetworkError; isTimeout; isAbort; statusCode (0 = no response); attempts.
+  NonRetryableHttpError extends HttpError with isRetryable: false — set for a deterministic failure (a throwing
+    getHeaders provider, an unserialisable body), which createFetchHttpClient therefore does not retry.
+    onError runs BEFORE the rejection and receives buildHttpErrorContext(error); a throwing onError is contained.
+  createAuthHeaderProvider(provider: AuthProvider, options?: AuthHeaderProviderOptions): AuthHeaderProvider
+    AuthProvider: getToken(): string | undefined | Promise<...>; refreshToken?(): Promise<string | undefined>;
+                  isTokenExpired?(token): boolean; onUnauthorized?(): void | Promise<void>; logout?(): void | Promise<void>
+    options: headerName = 'Authorization'; scheme = 'Bearer ' (set '' for a bare API key); getExtraHeaders?
+    Returns { getHeaders(): Promise<Record<string,string>>, refresh(): Promise<string | undefined> }. Never rejects.
+    Concurrent refresh() calls share ONE in-flight attempt (single-flight).
+    onUnauthorized is NOT called when there is simply no token (the normal anonymous path); it IS called when a
+    present token was stale and could not be refreshed.
+  createAuthInterceptor(provider: AuthProvider): HttpInterceptor
+    name 'auth'. onRequest merges the provider's headers under the per-request ones. onError on a 401 attempts ONE
+    refresh, then logout() + onUnauthorized() if it failed. It does NOT re-issue the request.
+  buildHttpErrorContext(error: HttpError): ErrorContext  -> { source: 'api', category, severity, api, tags }
+  categoryForHttpStatus(status, timedOut): 'auth'|'timeout'|'network'|'http'|'abort'  (401/403/407 auth; 408/504 timeout; 0 network)
+  severityForHttpError(status, timedOut): 'error' (timedOut or 0 or 5xx) | 'warning' (other 4xx)
+  isRetryableStatus(status): boolean   (0, 408, 429, 5xx)
+  resolveRequestUrl(url, baseUrl): string   ; DEFAULT_HTTP_TIMEOUT_MS = 30000 ; DEFAULT_HTTP_RETRY_DELAY_MS = 300
+
+@codewithrajat/rm-logvault/storage
+  Encryption adapters plus a repository wrapper. Re-exports CleanupPolicy and StorageFailureReason.
+  Types: EncryptionProvider { encrypt(plaintext): string | Promise<string>; decrypt(stored): string | Promise<string>; name? }
+         EncryptableRepository<T> { getAll; get; save; saveBatch?; claimPending?; getFailed?; pendingCount?; updateUploadStatus? }
+         EncryptingRepository<T> = EncryptableRepository<T> & { inner; provider }
+         EncryptingRepositoryOptions { fields: readonly string[]; onDecryptFailure?: (field, error) => void }
+         AesGcmEncryptionProviderOptions { password: string; salt: Uint8Array; iterations? = 250000 }
+  createEncryptingRepository<T>(inner, provider, options): EncryptingRepository<T>
+    fields accepts 'message' or a dotted path 'api.url'. save/saveBatch encrypt; get/getAll/claimPending/getFailed decrypt;
+    pendingCount and updateUploadStatus pass through untouched (they key on id/fingerprint/uploadStatus, which encryption would break).
+    A field that fails to decrypt KEEPS ITS STORED VALUE rather than being blanked, and onDecryptFailure is called.
+    A field whose encryption fails is written in PLAINTEXT rather than lost.
+  createBase64EncryptionProvider(): EncryptionProvider
+    ENCODING, NOT ENCRYPTION. btoa(encodeURIComponent(x)) / decodeURIComponent(atob(x)). Falls back to identity when
+    btoa/atob are absent. Provides no confidentiality.
+  createAesGcmEncryptionProvider(options): Promise<EncryptionProvider | undefined>   (undefined when crypto.subtle is unavailable)
+  createWebCryptoEncryptionProvider(key: CryptoKey): EncryptionProvider | undefined
+    Output is Base64 of [12-byte random IV][ciphertext]. A fresh IV per value.
+  deriveAesKey(password, salt, iterations = 250000): Promise<CryptoKey | undefined>
+    PBKDF2-SHA256 -> AES-GCM-256, derived non-extractable.
+  encryptRecordFields<T>(record, fields, provider): Promise<T>   (shallow copy; input never mutated)
+  decryptRecordFields<T>(record, fields, provider, onFailure?): Promise<T>
+  SECURITY NOTE: AES-GCM here is only as strong as where the key lives. A passphrase shipped in the same bundle
+  protects a database dump, not the data from a reader of the page. Redaction (not encryption) is the library's
+  privacy control; encryption is defence in depth for read access to the origin's storage.
+
+## 6. PERSISTED RECORD SHAPES
+
+ErrorRecord
+  schemaVersion: 1; id: string; fingerprint: string;
+  uploadStatus: 'pending'|'uploading'|'uploaded'|'failed'; uploadAttempts: number; claimedAt?: number;
+  source: ErrorSource; severity: ErrorSeverity; category: ErrorCategory; handled: boolean; thrownType: ThrownType;
+  name: string (<=1000); message: string (<=1000); stack?: string (<=8000);
+  causes?: { name; message; stack? }[] (<=3); componentStack?: string (<=4000);
+  location?: { source?; line?; column? }; api?: ApiErrorContext; event?: ErrorEventInfo;
+  page: { url: string; route: string; pageLoadId: string };
+  environment: { appName?; appVersion?; buildId?; environment?; userAgent?; platform?; viewport?; online?; visibilityState? };
+  tags?: Record<string,string> (<=20, key<=50, value<=200);
+  extra?: Record<string, unknown>;
+  timestamp: number; firstSeen: number; lastSeen: number; occurrenceCount: number (>=1)
+
+LogRecord
+  schemaVersion: 1; id: string; uploadStatus; uploadAttempts; claimedAt?;
+  level: LogLevel; message: string (<=1000); data?: readonly unknown[] (<=5);
+  route?: string (<=300, omitted when 'unknown'); pageLoadId: string;
+  environment: { appName?; appVersion?; buildId?; environment? };
+  timestamp: number; seq: number (per-page-load monotonic)
+
+ErrorContext (caller side, all optional): source, severity, category, componentStack, location, api, event, tags, extra, handled, timestamp.
+ApiErrorContext = { kind; method?; url? (sanitized); status?; statusText? (<=200); code?; timeout?; duration? (>=0); requestId? (<=200) }
+ErrorEventInfo = { type: string; targetTag?; resourceUrl?; directive?; blockedURI?; crossOrigin? }
+ErrorLocation = { source?; line?; column? }
+ErrorCause = { name: string; message: string; stack?: string }
+NormalizedError = { name; message; stack?; causes?; thrownType; isChunkError; isCrossOrigin; category?; aggregatedCount?; extra? }
+
+## 7. STORAGE SCHEMA
+
+DB 'rm-logvault-errors' (from `${dbPrefix}-errors`), version 1
+  store 'errors', keyPath 'id'
+  index 'by_fingerprint_status' on ['fingerprint','uploadStatus']
+  index 'by_status' on 'uploadStatus'
+DB 'rm-logvault-logs' (from `${dbPrefix}-logs`), version 1
+  store 'logs', keyPath 'id'
+  index 'by_status_timestamp' on ['uploadStatus','timestamp']
+  index 'by_timestamp' on 'timestamp'
+
+Cleanup runs on initialize() and every 25 (errors) / 200 (logs) successful writes, in chunks of 200 rows.
+Quota failure => halve the cap, run cleanup, retry the same write exactly once.
+DEFAULT_PENDING_LIMIT = 100. DEFAULT_OPEN_TIMEOUT_MS = 5000.
+Malformed rows are DELETED on read, not returned.
+
+STORAGE AVAILABILITY (no wrapper, no polyfill, no runtime dependency; uses globalThis.indexedDB directly)
+  property missing / not an object / open not a function        -> reason 'unavailable'
+  reading the property throws (browser refuses storage)         -> factory 'blocked', treated as 'unavailable'
+  open() is bounded by DEFAULT_OPEN_TIMEOUT_MS = 5000           -> reason 'transaction' on timeout
+  SecurityError on open                                          -> permanentlyUnavailable = true (no further retries)
+  stale-connection names that drop the cached handle: InvalidStateError, DatabaseClosedError, AbortError,
+    TransactionInactiveError; the next call reopens.
+  versionchange -> close our handle so another tab's upgrade is not blocked; onclose -> drop cache;
+    upgrade() is idempotent and re-runs after the database is deleted mid-session.
+  StorageFailureReason = 'unavailable' | 'quota' | 'serialization' | 'transaction'
+  StorageState         = 'initializing' | 'ready' | 'unavailable' | 'disabled'   (getTelemetryStatus().storage)
+  'quota' names: QuotaExceededError, NS_ERROR_DOM_QUOTA_REACHED, legacy code === 22.  'serialization': DataCloneError.
+  Each failure is reported once per stage through onInternalError as `storage (<reason>)`.
+  BROWSER POLICY, NOT LIBRARY LIMITATION (docs/BROWSER-SUPPORT.md):
+    - WebKit ITP deletes ALL script-writable storage (IndexedDB, localStorage, sessionStorage, service worker
+      registrations and cache) after 7 days of browser use without user interaction on the site; web apps added to
+      the home screen are exempt and keep their own counter. No API opts out of the cap.
+    - Private/incognito: different quotas, data usually discarded when the session ends; some Safari versions refuse
+      storage outright, throwing on property access or from open().
+    - Firefox 103+ partitions IndexedDB by top-level site, on by default. Opaque origins (sandbox without
+      allow-same-origin, data:, blob:) have no storage bucket and throw SecurityError.
+    - Storage is best-effort; navigator.storage.persist() requests an eviction exemption (Firefox prompts,
+      Chromium and WebKit decide silently). Firefox best-effort ceiling: min(10% of the volume, 10 GiB per-site group).
+    - Default retention (errors 7 days, logs 3 days) sits inside Safari's 7-day cap, but the cap counts from last
+      interaction, not from record age, so it can fire first.
+
+## 8. UPLOAD STATE MACHINE
+
+pending   --claimPending(limit, now)--> uploading  (uploadAttempts+1, claimedAt=now)
+pending   --save() with a matching fingerprint--> merged in place (occurrenceCount++, min/max firstSeen/lastSeen)
+uploading --2xx--> uploaded --delete(ids)--> row gone
+uploading --terminal status--> failed
+uploading --retryable / transport rejection / throwing getHeaders--> pending
+uploading --requeueStale(CLAIM_LEASE_MS=300000, now)--> pending (claimedAt deleted)
+failed    --retryFailedTelemetry()--> pending
+pending|failed --cleanup(retentionDays, maxRecords)--> deleted
+
+Aggregation never mutates an 'uploading' row.
+
+## 9. REST CONTRACT
+
+request: POST <errorsUrl|logsUrl>, Content-Type: application/json, credentials = rest.credentials (default 'same-origin'),
+         redirect 'follow', abort after REQUEST_TIMEOUT_MS = 10000, keepalive only on the unload flush when body < 60000 chars.
+body: { schemaVersion: 1, kind: 'errors'|'logs', sentAt: epochMs,
+        app: { appName, appVersion, buildId, environment },   // '' when not configured
+        records: [ ...ErrorRecord | LogRecord ] }
+response: only status and Retry-After are read. The body is NEVER read.
+
+classification:
+  2xx                                  -> ok        : delete(ids)
+  400,401,403,404,405,410,413,415,422  -> terminal  : updateUploadStatus(ids,'failed') + onTerminalFailure(status, records)
+  anything else non-2xx                -> retryable : updateUploadStatus(ids,'pending')
+  network/abort/timeout/status 0       -> retryable : updateUploadStatus(ids,'pending')
+
+backoff: min(15000 * 2^(failures-1), 900000) ms; the next delay is max(backoff, retryAfterMs).
+steady interval after success: rest.intervalMs (30000).
+first flush: FIRST_FLUSH_DELAY_MS = 5000 after start(); MAX_BATCHES_PER_FLUSH = 10; NOTIFY_DEBOUNCE_MS = 5000.
+start() runs requeueStale(CLAIM_LEASE_MS) before scheduling and attaches an 'online' listener that schedules +5000.
+Sync starts only after the storage readiness promise resolves true.
+Delivery is AT LEAST ONCE. Idempotency key = record id. Duplicates must be tolerated.
+The server must accept durably BEFORE returning 2xx, because the client deletes on 2xx.
+
+endpoint validation (resolveEndpoint):
+  reject: empty/whitespace; scheme javascript:|data:|vbscript:|file:|blob:|about:|chrome:|chrome-extension:
+  relative URLs resolve against window.location.href; outside a browser they are unusable
+  only http: and https: survive; requireHttps rejects http: unless hostname is localhost|127.0.0.1|::1|[::1]|0.0.0.0
+
+idempotent write: INSERT ... ON CONFLICT (id) DO NOTHING (key on id, never on fingerprint).
+
+## 10. REDACTION RULES (applied in this order)
+
+1. URLs in free text (https?|blob) -> sanitizeUrlValue; data: -> 'data:[REDACTED]'
+2. JWT: /\beyJ[\w-]{5,}\.[\w-]{5,}\.[\w-]*/g -> '[REDACTED]'
+3. Auth schemes: /\b(Bearer|Basic|Token)\s+[\w.~+/=-]{6,}/gi -> '$1 [REDACTED]'
+4. key=value secrets -> '$1[REDACTED]' with separators preserved
+   token|access_token|refresh_token|id_token ; password|pwd|secret|client_secret ; api_key|api-key|apikey|session|sessionid ; phone|mobile|msisdn|telephone|email
+5. Long opaque tokens with no key=value context: /(^|[^\w-])([\w-]{32,200})(?=[^\w-]|$)/g -> '$1[REDACTED]'
+6. E-mail: /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g -> '[REDACTED]'
+7. caller extraPatterns (win over everything above)
+then truncate to maxLength, with the '…[truncated N]' suffix counted INSIDE the budget.
+
+KNOWN LIMITATION: a bare short secret in prose is not detectable — sanitizeText('failed with hunter2')
+keeps 'hunter2'. Use redaction.extraPatterns for a known value. Asserted by src/errors/sanitize.test.ts.
+
+text is hard-truncated to HARD_TEXT_CAP = 20000 before any regex runs.
+
+URL sanitisation:
+  absolute -> rebuild `${protocol}//${host}` + sanitized path + redacted query (drops user:pass@)
+  non-http(s) absolute -> `${scheme}[REDACTED]`; data: -> 'data:[REDACTED]'
+  fragments dropped
+  query: value kept only when the key is allow-listed (case-insensitive) AND not sensitive; kept values truncated to 100
+  path segments: decoded segment that matches EMAIL_PATTERN, starts with 'eyJ', or matches /^[\w-]{32,}$/ -> '[REDACTED]'
+  stack: STACK_QUERY_PATTERN /\?[^\s:)]*(?=:\d+(?::\d+)?)/g removed first
+
+sensitive key check: key.toLowerCase().replace(/[-_\s]/g,'') tested against SENSITIVE_KEY_PATTERN; a sensitive KEY wins over the value.
+isSensitiveKey fails closed (returns true if the test throws).
+isAllowedQueryKey = allowedQueryParams.has(key.toLowerCase()) && !isSensitiveKey(key)
+
+NEVER READ: request/response bodies, axios params/data, cookies, document.cookie, localStorage, sessionStorage,
+            auth header values, form values, arbitrary headers (only the 4 correlation names are probed by name).
+
+## 11. PERSIST LEVELS AND CONSOLE LEVELS (independent)
+
+logs.level          = the PERSIST threshold  (default 'warn')
+logger.setLevel(...) = the CONSOLE threshold (default 'warn')
+Sinks run BEFORE the console filter. logger.setLevel('off') silences output while persistence continues.
+Reserved prefixes are never persisted: [ErrorTracking], [LogTracking], [Telemetry], [DiagnosticsExport].
+The internal console writer prefixes output with '[rm-logvault]'. console.* is allowed only in src/logger/consoleWriter.ts.
+PRE_INIT_LOG_BUFFER_SIZE = 50; PRE_INIT_ERROR_BUFFER_SIZE = 50; LOG_FLUSH_BATCH_SIZE = 50; LOG_FLUSH_INTERVAL_MS = 1000.
+All four are exported from the package root, as are ERROR_CLEANUP_EVERY_WRITES = 25 and
+LOG_CLEANUP_EVERY_WRITES = 200, so the defaults are readable from the API rather than only from source.
+NONE of them is an option (D-022). The two flush constants are the DEFAULTS of logs.writeFlushMs /
+logs.writeBatchSize, which ARE options; the cleanup cadence is adjustable only by supplying your own
+repository built with createErrorRepository/createLogRepository({ cleanupEveryWrites }); the pre-init
+buffer cannot be an option because it fills before initTelemetry can be configured.
+The first sink registered triggers replayPreInit().
+captureConsole wraps only console.warn and console.error; first string arg = message, rest = data.
+
+## 12. DIAGNOSTICS REPORT
+
+shortcut default: Ctrl+Shift+Alt+D (key 'd', ctrl+shift+alt true, meta false), capture phase on document,
+  ignored inside input/textarea/select/contenteditable, exact modifier match, allow() must return literal true.
+  match order: all four modifiers (exact) -> event.code === 'KeyD' (event.key only as fallback) -> isEditableTarget
+    -> allow() -> preventDefault(). Matching is on the PHYSICAL key because Alt+letter mangles event.key on
+    AZERTY, Dvorak, AltGr and macOS Option layouts.
+  REQUIRES A KEYBOARD: a phone or tablet never emits keydown, so the shortcut cannot fire there by construction.
+    On touch devices call exportDiagnosticsReport() from a button. Nothing is installed when there is no document
+    (SSR, prerender, worker), with shortcut:false, or before initTelemetry.
+  onExported is NOT called on the early-return paths (in flight, !isBrowser(), repository === null); it IS called
+    with false for a download or clipboard failure. "It never fired" therefore means either "did not match" or
+    "returned early" — the two are distinguished only by isExportInFlight() and getTelemetryStatus().
+filename: `${prefix}-${ISO with ':' and '.' -> '-'}.html|json`, prefix default 'diagnostics-report'.
+export: returns false when !isBrowser(), repository === null (disabled or not initialized), or an export is
+  already in flight, or the download cannot start. Storage 'unavailable' does NOT return false: the reads
+  return {ok:false,reason:'unavailable'}, the file is still written with 0 records, and onInternalError receives
+  'diagnostics-read-errors' / 'diagnostics-read-logs'. Disambiguate with getTelemetryStatus().storage.
+  flushes first; reads getAll() on both repositories (all uploadStatus values);
+  marshals in EXPORT_SLICE_SIZE = 500 slices with a setTimeout(0) yield;
+  defers revokeObjectURL by 1000 ms (Safari cancels a synchronous revoke);
+  copyToClipboard needs navigator.clipboard.writeText, else returns false (no silent fallback).
+report HTML: <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:">
+  referrer no-referrer, robots noindex nofollow.
+  records embedded once in <script type="application/json" id="diagnostics-data"> with < > & U+2028 U+2029 escaped as \uXXXX.
+  viewer uses only textContent / createElement; never innerHTML; makes no network requests.
+  privacy banner always present.
+  viewer drill-down (no extra payload fields; all derived from the embedded records):
+    page loads  : built once by joining errors on page.pageLoadId and logs on pageLoadId; each load gets a route,
+                  a first/last timestamp, a span and error/log counts. Rows are ordered newest-first and clickable:
+                  selecting a load filters BOTH the errors and the logs tables to it, and selecting the focused load
+                  again clears the filter. That toggle is what makes the table the picker; there is no <select>.
+    fingerprint : error rows are collapsed by fingerprint into one row each, with occurrenceCount summed across the
+                  contributing rows (a 'pending' and a claimed row for one fingerprint are never merged in storage);
+                  a collapsed group also shows a '<n> rows' pill.
+    drill panel : id="drill". Shows the selected error's severity/name, its message, a meta list (fingerprint, page
+                  load, route, first/last seen, occurrences, source, category, handled, upload status, plus request /
+                  response / duration when api context exists), its stack, its raw JSON, and every log from the same
+                  load ordered by timestamp with entries inside [firstSeen-5000, lastSeen+5000] highlighted (tr.near).
+                  The empty state prompts the reader to select an error row.
+    row counts  : errors-count reports fingerprints, logs-count and loads-count report rows vs totals.
+    controls    : id="search" (message, name, source, category, fingerprint, api.url, pageLoadId, route),
+                  id="severity", id="level".
+    markup note : tr.sel marks the focused load row and the selected error row.
+    viewer source lives in a TypeScript template literal, so it must never contain a backtick (a test asserts this),
+                  and tsc cannot see it: five tests extract and execute the viewer against happy-dom.
+The shortcut is OBSCURITY, NOT ACCESS CONTROL. Gate it with allow() if that is unacceptable.
+
+## 13. EDGE CASES AND GUARANTEES
+
+- captureError accepts null, undefined, primitives, Symbols, Proxies with throwing getters, circular cause graphs,
+  AggregateErrors (5 sub-errors read), cross-realm Errors (structural typing, not instanceof).
+- Identity dedup: a WeakSet remembers object/function errors so one Error reaching several paths is one record.
+  Primitives are not tracked by identity; identical strings collapse by fingerprint instead.
+- Re-entrancy guards: `capturing` (error pipeline), `busy` (logger dispatch), `replaying` (pre-init replay).
+- Rate limiting: fixed 60s window; excess dropped; ONE summary line per rolled window; fails open.
+- The dual-copy guard: state lives on globalThis[Symbol.for('logvault@1')] with a __logvaultState:true marker,
+  defined non-writable/non-enumerable/non-configurable, so duplicate bundles share one installation.
+- initTelemetry is idempotent; reconfiguration requires destroyTelemetry() first.
+- Global handlers merge registrations and never overwrite a pre-existing window.onerror; cleanup restores it only
+  while it is still ours, otherwise logVault stays installed but inert.
+- clearTelemetryData() clears rows (store.clear()), clears the pre-init buffer, and returns false with no repository.
+  It does NOT delete the databases and does NOT recall uploaded records.
+- consent() is evaluated on error capture, on log persist, and at the top of every flush run
+  (SyncManager.runFlush) before any network egress. Withdrawing consent therefore stops uploads of
+  already-queued records; they stay 'pending' until consent returns or clearTelemetryData() erases them.
+  A throwing consent gate fails closed.
+- Every option numeric/level/array invalid value is ignored rather than applied.
+- Offline: uploads are skipped when navigator.onLine is false, without counting a failure.
+- Failure counters reset on success; retryFailedTelemetry() also clears the backoff.
+- Nothing in the public API throws; every function that could fail returns a benign value instead.
+- SSR/Node/worker: safe to import and call; nothing installs, nothing captures, nothing throws.
+- Safari private mode: indexedDB access throws -> storage 'unavailable' -> console-only degradation. The report
+  still downloads but contains 0 records. See docs/BROWSER-SUPPORT.md for the full policy matrix.
+- The only network egress is createFetchTransport (or a caller-supplied transport). No beacons, no CDNs, no cookies.

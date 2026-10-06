@@ -1,0 +1,37 @@
+# @codewithrajat/rm-logvault
+
+> Offline-first, privacy-safe, zero-dependency browser error tracking, logging and diagnostics export. Persists to IndexedDB first, optionally syncs to your REST endpoint, and downloads a self-contained XSS-safe HTML report on Ctrl+Shift+Alt+D.
+
+logVault is a browser "black box recorder", not a dashboard. There is no server, no account and no
+vendor: errors and logs are captured, redacted before they are written, stored in two IndexedDB
+databases, and optionally uploaded to a REST endpoint you control. `initTelemetry({ appName: 'x' })`
+is the whole integration. Framework adapters for React, Vue, Angular, axios, fetch and TanStack Query
+are separate subpaths, as are `@codewithrajat/rm-logvault/http` and
+`@codewithrajat/rm-logvault/storage`, and the core is 36.55 kB min+gzip against a 37 kB regression
+budget, with zero runtime dependencies.
+
+## Docs
+
+- [README](https://github.com/malikrajat/rm-logvault/blob/main/README.md): The flagship document â€” pitch, quick start per framework, the full configuration table, logging, redaction, storage, uploads, the diagnostics report, `fromEnv`, FAQ and troubleshooting summary.
+- [Start here](https://github.com/malikrajat/rm-logvault/blob/main/examples/react/START-HERE.md): The linear walkthrough â€” four steps, two files, from nothing to a working integration with a real error-boundary fallback UI. Then the optional additions one at a time: a bearer token with refresh, encryption at rest (write/read flow, which fields, what it does and does not protect), the report formats, and the short flat-option form. **Read this before any tier guide**; the sequence is framework-agnostic and only the file locations differ.
+- [Examples](https://github.com/malikrajat/rm-logvault/blob/main/examples/README.md): Runnable code for every feature, in each of five frameworks (vanilla, React, Vue, Angular, Next.js) across four tiers (`basic`, `advanced`, `config`, `more-advanced`). The HTTP client, encryption at rest, events, context builders, the sink registry and the flat configuration aliases all appear in framework idiom here, which is the one thing `API.md` cannot show.
+- [Architecture](https://github.com/malikrajat/rm-logvault/blob/main/docs/ARCHITECTURE.md): Pipeline and sequence diagrams, the diagnostics-export path (gate-by-gate flowchart, sequence and failure branches), module layout, the `Symbol.for('logvault@1')` dual-copy guard, the serial write queue, the re-entrancy guard, the rate limiter and the identity `WeakSet`.
+- [API reference](https://github.com/malikrajat/rm-logvault/blob/main/docs/API.md): Every symbol exported from `src/index.ts`, grouped and alphabetised, with signatures, parameter tables, return values and examples; plus the `@codewithrajat/rm-logvault/react`, `/vue`, `/angular`, `/axios`, `/fetch`, `/react-query`, `/http`, `/storage` and `/testing` subpaths.
+- [Configuration](https://github.com/malikrajat/rm-logvault/blob/main/docs/CONFIGURATION.md): The exhaustive option reference, precedence (explicit > `fromEnv` > default), the invalid-value rules, and minimal / production / staging / GDPR-strict / air-gapped presets.
+- [Options cheat-sheet](https://github.com/malikrajat/rm-logvault/blob/main/docs/OPTIONS-CHEATSHEET.md): The complete `TelemetryOptions` object in one block â€” every option with its real default inline â€” then a deep dive per option (what it means, what it does and does not do, what `true` / `false` / `0` / an invalid value resolves to, its limits and when it is read, and every callback signature), the master-switch interaction map, the `DiagnosticsExportOptions` table and six copy-pasteable presets.
+- [REST contract](https://github.com/malikrajat/rm-logvault/blob/main/docs/REST-CONTRACT.md): JSON Schema (draft 2020-12) for the batch envelope, a worked request and response, the status-code table, `Retry-After` semantics, server obligations, and minimal Express and Fastify handlers.
+- [Security](https://github.com/malikrajat/rm-logvault/blob/main/docs/SECURITY.md): Threat model, the redaction design, XSS safety of the report by construction, prototype-pollution and ReDoS safety, the endpoint allow-list, the single-egress guarantee, supply-chain posture, and the fail-closed/fail-open policy.
+- [Privacy and GDPR](https://github.com/malikrajat/rm-logvault/blob/main/docs/PRIVACY-GDPR.md): Lawful basis, the data categories stored, retention defaults and how to change them, the `consent()` gate and exactly when it is evaluated, `clearTelemetryData()` for erasure, the subject-access path, a DPA checklist and a consent banner example.
+- [Browser support](https://github.com/malikrajat/rm-logvault/blob/main/docs/BROWSER-SUPPORT.md): IndexedDB availability per engine with no wrapper required, then the browser-policy limits â€” Safari's seven-day cap on script-writable storage, private windows, third-party partitioning and opaque origins, quota and eviction, a blocked upgrade, site data cleared mid-session â€” mapped to `StorageFailureReason` and `StorageState`.
+- [Troubleshooting](https://github.com/malikrajat/rm-logvault/blob/main/docs/TROUBLESHOOTING.md): Symptom-by-symptom diagnosis and fixes â€” storage unavailable, nothing uploading, shortcut not firing, CORS, CSP `connect-src`, stuck `failed` records, empty reports, errors missing while logs are stored, missing info-level logs, duplicates, bundle size, and missing pre-init errors.
+- [Decisions](https://github.com/malikrajat/rm-logvault/blob/main/docs/DECISIONS.md): An ADR log for the load-bearing choices (naming, `exactOptionalPropertyTypes`, `dbPrefix`, `ErrorSource`, synchronous status, idempotent init, truncation budget, opt-in `env`, storage-gated sync, pending-only aggregation, the Angular factory provider, `Object.fromEntries`, the bundle budget and its measured raises to 32 kB and 37 kB, the report drill-down, and the pnpm workspace with its seven-day dependency cooldown), plus the assumptions the implementation rests on.
+- [Full reference for LLMs](https://github.com/malikrajat/rm-logvault/blob/main/llms-full.txt): A dense single-file API reference â€” every export, every option and default, every constant, the REST contract, the redaction rules and the edge cases, with no prose padding.
+- [Contributing](https://github.com/malikrajat/rm-logvault/blob/main/CONTRIBUTING.md): Dev setup, the pnpm script table, conventional commits and the commitlint scope enum, the changeset workflow, the coverage gates and the PR checklist.
+- [Changelog](https://github.com/malikrajat/rm-logvault/blob/main/CHANGELOG.md): Release history in Keep-a-Changelog format, managed by changesets.
+- [Agent rules](https://github.com/malikrajat/rm-logvault/blob/main/AGENTS.md): The invariants an automated coding agent must never break, the file layout, how to run the checks, and how to add an adapter or a document.
+
+## Optional
+
+- [pnpm package](https://www.npmjs.com/package/@codewithrajat/rm-logvault): Published tarball with provenance attestation. Zero runtime dependencies; all framework peers are optional.
+- [REST contract schema](https://github.com/malikrajat/rm-logvault/blob/main/docs/REST-CONTRACT.md#2-json-schema-draft-2020-12): The authoritative wire format, if you are implementing the receiving endpoint.
+- [Security advisories](https://github.com/malikrajat/rm-logvault/security/advisories/new): Private disclosure channel. Please do not open a public issue for a vulnerability.
