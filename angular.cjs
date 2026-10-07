@@ -1385,5 +1385,3 @@ function getPreviousErrorHandler(injector) {
 exports.TelemetryErrorHandler = TelemetryErrorHandler;
 exports.getPreviousErrorHandler = getPreviousErrorHandler;
 exports.provideTelemetryErrorHandler = provideTelemetryErrorHandler;
-//# sourceMappingURL=angular.cjs.map
-//# sourceMappingURL=angular.cjs.map
