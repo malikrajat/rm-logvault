@@ -1406,5 +1406,3 @@ function createTelemetryVuePlugin(options = {}) {
 
 exports.attachVueTelemetry = attachVueTelemetry;
 exports.createTelemetryVuePlugin = createTelemetryVuePlugin;
-//# sourceMappingURL=vue.cjs.map
-//# sourceMappingURL=vue.cjs.map

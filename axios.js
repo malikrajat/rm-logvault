@@ -1539,5 +1539,3 @@ function attachAxios(instance2) {
 }
 
 export { attachAxios };
-//# sourceMappingURL=axios.js.map
-//# sourceMappingURL=axios.js.map
