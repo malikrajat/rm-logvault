@@ -4,10 +4,6 @@
 
 ### Patch Changes
 
-- Correct the documentation where it did not match the source, and state the dedupe rule explicitly.
-  
-  Four claims were wrong or missing, and each one had already cost somebody time.
-  
   ## `logger.error(msg, error)` has never captured an error
   
   Integration notes elsewhere describe `logger.error('[Checkout] failed', error)` as auto-capturing an
