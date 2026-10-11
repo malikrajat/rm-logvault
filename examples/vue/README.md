@@ -15,7 +15,7 @@ the first, so the adapter **chains** the handler you already have instead of rep
 | [basic](./basic/README.md) | You want errors and logs recorded, with one call and no backend. | Nothing. This is the first thing to read. |
 | [advanced](./advanced/README.md) | Records should reach a collector, and you need to decide how much is kept. | The basic integration, working. |
 | [config](./config/README.md) | The same build has to behave differently per environment, without code changes. | A deployment worth configuring. |
-| [more-advanced](./more-advanced/README.md) | "IndexedDB plus `fetch`" is not the shape of your deployment, and you want to replace a part. | Everything above, and a reason to. |
+| [more-advanced](./more-advanced/README.md) | "IndexedDB plus `fetch`" is not the shape of your deployment, you own a `Worker`, or you want to replace a part. | Everything above, and a reason to. |
 
 ## Pages in each tier
 
@@ -24,7 +24,7 @@ the first, so the adapter **chains** the handler you already have instead of rep
 | [basic](./basic/README.md) | the three lines, in order, and why the order matters | [capture recipes](./basic/01-capture-recipes.md) — the four ways an error gets recorded |
 | [advanced](./advanced/README.md) | uploads and retention | [what arrives at your collector](./advanced/02-what-arrives-at-the-collector.md) |
 | [config](./config/README.md) | the options that matter | [environment variables](./config/01-environment-variables.md), [levels and thresholds](./config/03-levels-and-thresholds.md) |
-| [more-advanced](./more-advanced/README.md) | the adapter and the replaceable seams | [the Vue adapter](./more-advanced/01-framework-adapter.md), [observing and extending](./more-advanced/04-observing-and-extending.md), [the HTTP client](./more-advanced/05-using-the-http-client.md), [encrypting stored records](./more-advanced/06-encrypting-stored-records.md), [the recipes and choosing between them](./more-advanced/03-recipes-and-deciding.md) |
+| [more-advanced](./more-advanced/README.md) | the adapter and the replaceable seams | [the Vue adapter](./more-advanced/01-framework-adapter.md), [observing and extending](./more-advanced/04-observing-and-extending.md), [the HTTP client](./more-advanced/05-using-the-http-client.md), [encrypting stored records](./more-advanced/06-encrypting-stored-records.md), [workers and dynamic imports](./more-advanced/07-workers-and-dynamic-imports.md), [duplicates, floods and testing](./more-advanced/08-dedupe-throttling-and-testing.md), [the recipes and choosing between them](./more-advanced/03-recipes-and-deciding.md) |
 
 ## Read them in this order
 

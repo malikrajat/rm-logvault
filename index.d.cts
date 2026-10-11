@@ -1,9 +1,9 @@
-import { L as LogLevelSetting, a as LogRecord, T as TelemetryRepository, E as ExternalLogSource, F as FlushSummary, b as ErrorRepository, c as LogRepository, S as StorageState, d as LogSink, e as Logger, f as LogLevel, g as StorageFailureReason, C as CleanupPolicy } from './storage.types-BW8tLQEw.cjs';
-export { h as LOG_LEVELS, i as LOG_LEVEL_PRIORITY, j as LogEnvironment, P as PRE_INIT_LOG_BUFFER_SIZE, k as StorageResult, l as levelPriority, m as meetsLevel } from './storage.types-BW8tLQEw.cjs';
-import { R as RemoteTransport, S as SyncStatus, a as RestBatchBody } from './sync.types-C0RivCxN.cjs';
-export { T as TERMINAL_STATUSES, b as TransportRequest, c as TransportResponse, d as backoffDelay, p as parseRetryAfter } from './sync.types-C0RivCxN.cjs';
-import { M as Maybe, a as ErrorRecord, T as Timestamp, A as ApiErrorContext, b as ErrorCategory, c as ErrorSeverity, d as ApiErrorKind, E as ErrorContext, N as NormalizedError, e as ErrorSource, f as ErrorEventInfo, g as ErrorLocation, R as Result, h as RecordKind } from './types-vgch86Bo.cjs';
-export { i as ErrorCause, j as ThrownType } from './types-vgch86Bo.cjs';
+import { L as LogLevelSetting, a as LogRecord, T as TelemetryRepository, E as ExternalLogSource, F as FlushSummary, b as ErrorRepository, c as LogRepository, S as StorageState, d as LogSink, e as Logger, f as LogLevel, g as StorageFailureReason, C as CleanupPolicy } from './storage.types-CNjOSust.cjs';
+export { h as LOG_LEVELS, i as LOG_LEVEL_PRIORITY, j as LogEnvironment, P as PRE_INIT_LOG_BUFFER_SIZE, k as StorageResult, l as levelPriority, m as meetsLevel } from './storage.types-CNjOSust.cjs';
+import { R as RemoteTransport, S as SyncStatus, a as RestBatchBody } from './sync.types-BBoZHZDA.cjs';
+export { T as TERMINAL_STATUSES, b as TransportRequest, c as TransportResponse, d as backoffDelay, p as parseRetryAfter } from './sync.types-BBoZHZDA.cjs';
+import { M as Maybe, a as ErrorRecord, T as Timestamp, A as ApiErrorContext, b as ErrorCategory, c as ErrorSeverity, d as ApiErrorKind, E as ErrorContext, N as NormalizedError, e as ErrorContextPatch, f as ErrorSource, g as ErrorEventInfo, h as ErrorLocation, R as Result, i as RecordKind } from './types--hrpBzU7.cjs';
+export { j as ErrorCause, k as ThrownType } from './types--hrpBzU7.cjs';
 
 /**
  * Public configuration surface and its resolution rules.
@@ -38,6 +38,24 @@ interface ErrorsOptions {
     readonly maxPayloadBytes?: Maybe<number>;
     /** Fixed-window rate limit. Excess is dropped and summarised. Default `120`. */
     readonly maxEventsPerMinute?: Maybe<number>;
+    /**
+     * Maximum records persisted for **one** failure per 60-second window. Default `12`.
+     *
+     * @remarks
+     * The global limit answers "how many errors may this page produce per minute"; this
+     * one answers "may *this* error be produced again". Without it, a poll that
+     * refetches every five seconds and fails every time spends a tenth of the default
+     * error budget on a failure that is already in the report, so a handful of distinct
+     * failing queries exhausts the budget and the *new* failures are the ones lost.
+     *
+     * A repeat refused here does **not** consume the global budget, which is the entire
+     * point. Records that are admitted still aggregate onto the one `pending` row for
+     * their fingerprint, so twelve admitted repeats produce one row with
+     * `occurrenceCount: 12`, not twelve rows.
+     *
+     * `0` disables per-fingerprint throttling, restoring the previous behaviour exactly.
+     */
+    readonly maxRepeatsPerMinute?: Maybe<number>;
     /** Query parameter names whose values survive URL redaction. */
     readonly allowedQueryParams?: Maybe<readonly string[]>;
     /**
@@ -339,6 +357,8 @@ interface ResolvedErrorsOptions {
     readonly retentionDays: number;
     readonly maxPayloadBytes: number;
     readonly maxEventsPerMinute: number;
+    /** Records one fingerprint may produce per 60-second window; `0` disables it. */
+    readonly maxRepeatsPerMinute: number;
     readonly allowedQueryParams: readonly string[];
     readonly preventDefaultUnhandledRejection: boolean;
     readonly captureResources: boolean;
@@ -426,6 +446,8 @@ declare const DEFAULT_OPTIONS: {
         readonly retentionDays: 7;
         readonly maxPayloadBytes: 16384;
         readonly maxEventsPerMinute: 120;
+        /** A tenth of `maxEventsPerMinute`, so one failure cannot own the whole budget. */
+        readonly maxRepeatsPerMinute: 12;
         readonly preventDefaultUnhandledRejection: false;
         readonly captureResources: false;
         readonly captureCsp: false;
@@ -844,6 +866,17 @@ interface TelemetryStatus {
         readonly logs: number;
     };
     readonly droppedByRateLimit: number;
+    /**
+     * Repeats of an already-reported failure refused by per-fingerprint throttling.
+     *
+     * @remarks
+     * Separate from {@link TelemetryStatus.droppedByRateLimit} because the two are read
+     * differently. A rate-limit drop means the page is producing too much and records are
+     * genuinely missing. A repeat drop means the failure is *already in the report* and
+     * the budget went to new failures instead — which is the intended outcome of
+     * `errors.maxRepeatsPerMinute`, not a gap.
+     */
+    readonly droppedByRepeat: number;
     readonly lastSync: number | undefined;
     readonly syncStatus: SyncStatus;
 }
@@ -1063,8 +1096,8 @@ declare function isTelemetryInitialized(): boolean;
  * import { ADAPTERS, adapterFor } from '@codewithrajat/rm-logvault';
  *
  * ADAPTERS.map((adapter) => adapter.framework);
- * // ['react', 'vue', 'angular', 'axios', 'fetch', 'tanstack-query', 'core', 'core', 'core']
- * // 'core' marks an integration with no framework: /http, /storage and /testing.
+ * // ['react', 'vue', 'angular', 'axios', 'fetch', 'core', 'tanstack-query', 'core', 'core', 'core']
+ * // 'core' marks an integration with no framework: /worker, /http, /storage and /testing.
  *
  * adapterFor('vue')?.entryPoint;
  * // '@codewithrajat/rm-logvault/vue'
@@ -1183,6 +1216,8 @@ interface EnvOptions {
     readonly errorsMaxPayloadBytes?: number;
     /** `ERROR_TRACKING_MAX_EVENTS_PER_MINUTE` — `0` disables the limiter. */
     readonly errorsMaxEventsPerMinute?: number;
+    /** `ERROR_TRACKING_MAX_REPEATS_PER_MINUTE` — `0` disables per-fingerprint throttling. */
+    readonly errorsMaxRepeatsPerMinute?: number;
     /** `LOG_PERSIST_ENABLED`. */
     readonly logsEnabled?: boolean;
     /** `LOG_LEVEL` — the **console** level applied at initialisation. */
@@ -1247,6 +1282,7 @@ interface EnvOptions {
  * | `ERROR_TRACKING_MAX_RECORDS`            | `errors.maxRecords`         | rows                          | `500`     |
  * | `ERROR_TRACKING_MAX_PAYLOAD_BYTES`      | `errors.maxPayloadBytes`    | UTF-8 bytes                   | `16384`   |
  * | `ERROR_TRACKING_MAX_EVENTS_PER_MINUTE`  | `errors.maxEventsPerMinute` | events per 60 s, `0` = off    | `120`     |
+ * | `ERROR_TRACKING_MAX_REPEATS_PER_MINUTE` | `errors.maxRepeatsPerMinute`| records per fingerprint per 60 s, `0` = off | `12` |
  *
  * **Logs — their own IndexedDB store**
  *
@@ -1656,6 +1692,16 @@ interface ErrorTracker {
     subscribe(listener: (record: ErrorRecord) => void): () => void;
     /** Events dropped by the rate limiter in the current window. */
     droppedByRateLimit(): number;
+    /**
+     * Repeats of one fingerprint refused in the current window.
+     *
+     * @remarks
+     * Counted separately from {@link ErrorTracker.droppedByRateLimit} because the two
+     * mean different things to whoever is reading a report: a rate-limit drop is a page
+     * producing too much, while a repeat drop is one known failure being refused the
+     * budget that new failures need.
+     */
+    droppedByRepeat(): number;
     /** Stop accepting records. */
     destroy(): void;
     /** Persist everything queued and wait for the write chain to settle. */
@@ -1759,6 +1805,180 @@ declare function captureApiError(error: unknown, startedAt?: number): void;
  * ```
  */
 declare function captureFetchError(request: FetchRequestInfo, failure: FetchFailure): void;
+
+/**
+ * The dynamic-import adapter: capture a chunk failure once, at the call site.
+ *
+ * @remarks
+ * A failed `import()` is the most confusing failure a single-page application
+ * produces. It is thrown from inside the bundler's runtime, it arrives at whichever
+ * boundary happens to be mounted, it is nearly always reported twice — once by the
+ * chunk handler and once by the boundary — and its message names a hashed filename
+ * that means nothing to the person reading the report.
+ *
+ * ```ts
+ * const load = withChunkCapture('Overview', () => import('./pages/Overview'));
+ * const Page = lazy(load);
+ * ```
+ *
+ * Three things make the record answerable:
+ *
+ * - `source: 'chunk'` with a `route` tag, so the failure is filed under the screen
+ *   the user was trying to reach rather than under a filename.
+ * - `handled: false`, because the rejection is re-thrown. The boundary that receives
+ *   it also calls `captureError`, and the two calls agree on the record — dedupe by
+ *   identity means the boundary's capture is not a second row.
+ * - The original rejection value is re-thrown **unchanged**, so the application's own
+ *   retry or reload logic sees exactly what `import()` rejected with.
+ *
+ * @packageDocumentation
+ */
+
+/**
+ * Wrap a dynamic import so a failure is captured once and re-thrown unchanged.
+ *
+ * @param route - the screen or feature being loaded; recorded as the `route` tag
+ * @param loader - the import, or any function returning a promise. A loader that
+ * throws synchronously is captured too, and the returned promise rejects.
+ * @param ctx - optional extra context. `source`, `category`, `severity` and
+ * `handled` default to the chunk-failure values described above and may each be
+ * overridden.
+ * @returns a loader with the same signature, which **never throws synchronously**
+ *
+ * @remarks
+ * The wrap is deliberately **not** gated on `errors.captureChunkErrors`. That option
+ * decides whether the *library's* own global handlers treat an uncaught
+ * dynamic-import failure as a chunk error; calling this function is an explicit
+ * request, and honouring a setting that already defaults to `true` would only add a
+ * way for the call to silently do nothing.
+ *
+ * @example
+ * ```tsx
+ * import { lazy } from 'react';
+ * import { withChunkCapture } from '@codewithrajat/rm-logvault';
+ *
+ * const Overview = lazy(withChunkCapture('Overview', () => import('./Overview')));
+ * ```
+ *
+ * @example
+ * ```ts
+ * // A lazy route, with the route pattern attached as a tag.
+ * const load = withChunkCapture(
+ *   '/orders/:id',
+ *   () => import('./pages/OrderDetail'),
+ *   { tags: { flow: 'checkout' } },
+ * );
+ *
+ * try {
+ *   await load();
+ * } catch {
+ *   offerReload();
+ * }
+ * ```
+ */
+declare function withChunkCapture<T>(route: string, loader: () => Promise<T>, ctx?: ErrorContext): () => Promise<T>;
+
+/**
+ * Enriching a record that deduplication has already seen.
+ *
+ * @remarks
+ * Deduplication is by object identity, and it used to be lossy in the worst
+ * possible direction. The *first* path an `Error` travelled determined the record,
+ * and every later path — the one that actually knew what the failure meant — was
+ * discarded whole:
+ *
+ * ```ts
+ * // window.onerror wins, and files the record as `source: 'manual'` with no tags.
+ * window.addEventListener('error', () => captureError(err));
+ *
+ * // …the route loader that produced it knows better, and its knowledge vanished.
+ * captureError(err, { source: 'router', tags: { route: '/orders' } });
+ * ```
+ *
+ * The record was still written, which made it worse than a drop: the report showed
+ * the failure with the wrong origin and none of the context that would have
+ * identified it.
+ *
+ * The fix is not to capture twice — that would double `occurrenceCount` and consume
+ * a second rate-limit token for one occurrence. It is to apply the second call's
+ * *added knowledge* to the record that already exists. This module owns both halves
+ * of that: building a sanitized {@link ErrorContextPatch} from a caller's
+ * `ErrorContext`, and applying one to a stored record.
+ *
+ * @packageDocumentation
+ */
+
+/**
+ * Apply a patch to a stored record.
+ *
+ * @param record - the record as it currently exists
+ * @param patch - the enrichment to apply
+ * @returns a new record, or `null` when the patch changed nothing
+ *
+ * @remarks
+ * Pure and total: it never mutates its input and never throws. A `source` change
+ * also recomputes the fingerprint, because `source` is the first hashed part —
+ * leaving the two out of step would put a record in a group its own fields do not
+ * describe, and `save` aggregates on that group.
+ *
+ * Callers must not pass a record whose `uploadStatus` is not `pending`. A claimed
+ * row belongs to an in-flight request; see {@link ErrorContextPatch}.
+ */
+declare function applyErrorContextPatch(record: ErrorRecord, patch: ErrorContextPatch): ErrorRecord | null;
+
+/**
+ * Turning anything into an `Error`, without ever throwing.
+ *
+ * @remarks
+ * `throw` accepts anything. Callers who need an `Error` — to reject with, to hand to
+ * a framework, to put in a `cause` chain — wrote the same three lines by hand, and
+ * every version of them was wrong somewhere:
+ *
+ * ```ts
+ * // A lint error (`no-base-to-string`), and `[object Object]` for a plain object.
+ * throw new Error(String(error));
+ *
+ * // Throws `TypeError: Converting circular structure to JSON` for a cyclic object,
+ * // which turns "report this failure" into a second, worse failure.
+ * throw new Error(JSON.stringify(error));
+ * ```
+ *
+ * `normalizeError` already solves this internally — it is total, bounded and
+ * sanitizing — but it returns a record shape, not an `Error`. This module is the
+ * thin bridge: {@link toError} returns the original `Error` untouched when that is
+ * what it was given, and otherwise builds one whose message came out of the
+ * normaliser and whose `cause` is the original value.
+ *
+ * @packageDocumentation
+ */
+/**
+ * Coerce any thrown value into an `Error`.
+ *
+ * @param value - the value that was thrown or reported
+ * @returns the original `Error` when `value` already is one (including one from
+ * another realm), otherwise a new `Error` whose `message` is the normalised summary
+ * and whose `cause` is `value`
+ *
+ * @remarks
+ * **Never throws.** The message is produced by `normalizeError`, so it is bounded by
+ * {@link MAX_MESSAGE_LENGTH}, already redacted, and safe for a cyclic or hostile
+ * object — `JSON.stringify` is never called on raw input.
+ *
+ * `cause` is attached with `Object.defineProperty` rather than the `Error` options
+ * bag, which is an ES2022 feature while the library targets ES2020. A runtime that
+ * refuses the definition still gets a usable `Error`; only the link is lost.
+ *
+ * @example
+ * ```ts
+ * import { toError } from '@codewithrajat/rm-logvault';
+ *
+ * toError(new TypeError('bad')).message;   // 'bad' — the original object, unchanged
+ * toError('boom').message;                 // 'boom'
+ * toError({ a: 1 }).message;               // 'Non-Error value thrown: {"a":1}'
+ * toError(cycle).cause;                    // the cyclic object, unstringified
+ * ```
+ */
+declare function toError(value: unknown): Error;
 
 /**
  * Error fingerprinting and deduplication keys.
@@ -2167,6 +2387,12 @@ declare const DEFAULT_ALLOWED_QUERY_PARAMS: readonly string[];
 /**
  * Sources that represent an error the application did not explicitly handle.
  * `handled` is derived as `!UNHANDLED_SOURCES.has(source)`.
+ *
+ * @remarks
+ * `'worker'` and `'timeout'` are both here for the same reason: a worker that failed and a worker
+ * that never answered are failures the application did not handle — it is waiting for the answer.
+ * `'router'` is deliberately **not**: a caller that catches a route-loader rejection has decided how
+ * to handle it, so `handled` stays `true` unless the caller overrides it.
  */
 declare const UNHANDLED_SOURCES: ReadonlySet<string>;
 
@@ -3468,6 +3694,73 @@ interface RateLimiter {
  * ```
  */
 declare function createRateLimiter(maxPerWindow: number, onWindowRoll?: (dropped: number) => void): RateLimiter;
+/**
+ * Default cap on how many distinct keys a {@link RepeatLimiter} tracks per window.
+ *
+ * @remarks
+ * The counter map is the one unbounded structure a keyed limiter could grow, so it
+ * is capped. Beyond the cap an untracked key is admitted rather than refused:
+ * failing open keeps a genuinely new failure reportable, and the global limiter is
+ * still the backstop against a flood.
+ */
+declare const REPEAT_LIMITER_MAX_KEYS = 500;
+/**
+ * A bounded, per-key fixed-window limiter.
+ *
+ * @remarks
+ * The global limiter answers "how many errors may this page produce per minute".
+ * It does not answer "may *this* error be produced again", and that is the question
+ * a failing poll asks. A query that refetches every five seconds and fails every
+ * time produces twelve records a minute for one bug, which is a tenth of the default
+ * error budget spent on a failure already in the report — so a handful of distinct
+ * failing queries exhausts the budget and the *new* failures are the ones dropped.
+ *
+ * This limiter is consulted **before** the global one on purpose. A repeat that is
+ * over its own cap must cost nothing at all, not merely be refused: charging it a
+ * global token is exactly the behaviour that starves everything else.
+ *
+ * Two calls rather than one, because the global limiter sits between them: a repeat
+ * is only *recorded* once it has also been admitted globally, so a window in which
+ * the global budget was already spent does not silently consume every per-key slot.
+ */
+interface RepeatLimiter {
+    /** Whether `key` is already over its cap for this window. Registers nothing. */
+    blocked(key: string): boolean;
+    /** Register one admitted occurrence of `key`. */
+    record(key: string): void;
+    /** Repeats refused in the current window. */
+    dropped(): number;
+    /** Distinct keys currently tracked. */
+    tracked(): number;
+    /** Drop in-flight window state. */
+    reset(): void;
+}
+/**
+ * Create a {@link RepeatLimiter}.
+ *
+ * @param maxPerKey - maximum admitted occurrences of one key per 60-second window.
+ * A non-positive or non-finite value disables per-key limiting entirely.
+ * @param onWindowRoll - called with the refused count when a window rolls over;
+ * only invoked when at least one repeat was refused
+ * @param maxKeys - cap on tracked keys per window. Defaults to
+ * {@link REPEAT_LIMITER_MAX_KEYS}.
+ * @returns a {@link RepeatLimiter}
+ *
+ * @example
+ * ```ts
+ * import { createRepeatLimiter } from '@codewithrajat/rm-logvault';
+ *
+ * const repeats = createRepeatLimiter(12, (dropped) => {
+ *   console.warn(`repeat-limit (${dropped} refused)`);
+ * });
+ *
+ * if (!repeats.blocked('TypeError|boom') && globalLimiter.allow()) {
+ *   repeats.record('TypeError|boom');
+ *   capture();
+ * }
+ * ```
+ */
+declare function createRepeatLimiter(maxPerKey: number, onWindowRoll?: (dropped: number) => void, maxKeys?: number): RepeatLimiter;
 
 /**
  * Process-wide singleton state and teardown bookkeeping.
@@ -3577,4 +3870,4 @@ interface TelemetryState {
  */
 declare function getState(): TelemetryState;
 
-export { ADAPTERS, type AdapterDescriptor, type AdapterKind, type ApiClassification, ApiErrorContext, ApiErrorKind, CORRELATION_HEADERS, CleanupPolicy, DEFAULT_ALLOWED_QUERY_PARAMS, DEFAULT_ENV_PREFIXES, DEFAULT_OPTIONS, DIAGNOSTICS_CSV_COLUMNS, type DbConnection, type DiagnosticsExportOptions, type DiagnosticsExportResult, type DiagnosticsFormat, type DiagnosticsShortcutOptions, ERROR_CLEANUP_EVERY_WRITES, EXPORT_SLICE_SIZE, type EnvOptions, type ErrorCapturedEvent, ErrorCategory, ErrorContext, type ErrorContextBuilder, ErrorLocation, ErrorRecord, ErrorRepository, type ErrorRepositoryOptions, ErrorSeverity, ErrorSource, type ErrorsOptions, type EventEmitter, ExternalLogSource, type FetchFailure, type FetchRequestInfo, type FetchTransportOptions, type FingerprintInput, type FlushResult, FlushSummary, type GlobalHandlerOptions, type IdbCoreOptions, LOG_CLEANUP_EVERY_WRITES, LogLevel, LogLevelSetting, LogRecord, LogRepository, type LogRepositoryOptions, LogSink, type LogWrittenEvent, Logger, type LoggerController, type LogsOptions, MAX_ARRAY_ITEMS, MAX_CAUSE_DEPTH, MAX_COMPONENT_STACK_LENGTH, MAX_DEPTH, MAX_KEYS, MAX_LOG_ARGS, MAX_MESSAGE_LENGTH, MAX_STACK_LENGTH, MAX_STRING_LENGTH, MAX_TAGS, PRE_INIT_ERROR_BUFFER_SIZE, REDACTED, REPORT_PRIVACY_BANNER, type RateLimiter, type RecordDroppedEvent, type RedactionOptions, RemoteTransport, type ReportMeta, type ReportPayload, type ResolvedErrorsOptions, type ResolvedLogsOptions, type ResolvedRedactionOptions, type ResolvedRestOptions, type ResolvedShortcutOptions, type ResolvedTelemetryOptions, type ResponseOutcome, RestBatchBody, type RestOptions, SENSITIVE_KEY_PATTERN, type Sanitizer, type SanitizerConfig, type SerialQueue, type ShortcutConfig, type ShortcutOptions, type SimpleTelemetryOptions, type SinkRegistration, type SinkRegistry, StorageFailureReason, type StorageMode, StorageState, type SyncCompletedEvent, type SyncFailedEvent, type SyncManager, type SyncManagerOptions, type SyncStartedEvent, SyncStatus, type TelemetryEvent, type TelemetryEventListener, type TelemetryEventMap, type TelemetryEventPayload, type TelemetryEventType, type TelemetryHandle, type TelemetryOptions, TelemetryRepository, type TelemetryState, type TelemetryStatus, UNHANDLED_SOURCES, UNNORMALIZABLE, adapterFor, adapterFrameworks, buildApiErrorContext, buildFetchErrorContext, buildReportPayload, buildRestBody, byteLength, captureApiError, captureError, captureFetchError, categoryForKind, classifyResponse, classifyStorageError, clearErrorContextBuilders, clearTelemetryData, createDbConnection, createErrorRepository, createEventEmitter, createFetchTransport, createLogRepository, createLogger, createRateLimiter, createSanitizer, createSerialQueue, createSinkRegistry, createSyncManager, cyrb53, databaseNames, destroyTelemetry, diagnosticsFilename, encodeJsonForHtml, errorContextBuilderCount, escapeHtml, escapeJsonText, expectedCode, exportDiagnosticsReport, fingerprint, fingerprintParts, flushTelemetry, fromEnv, getDefaultSanitizer, getGlobal, getSinkRegistry, getState, getTelemetryStatus, globalHandlerCount, globalHandlersAttached, httpErrorContextBuilder, initTelemetry, installBuiltinContextBuilders, installDiagnosticsExportShortcut, installGlobalErrorHandlers, installShortcut, isAuthError, isBrowser, isEditableTarget, isErrorRecord, isExportInFlight, isLogRecord, isSensitiveKey, isSyncConfigured, isTelemetryInitialized, listErrorContextBuilders, logger, markAuthError, matchesShortcut, newId, newPageLoadId, normalizeError, normalizePathForFingerprint, promisifyRequest, reduceErrorPayload, reduceLogPayload, registerErrorContextBuilder, renderDiagnosticsReport, reportInternalFailure, reportInternalNote, resolveEndpoint, resolveEndpoints, resolveErrorContext, resolveOptions, retryFailedTelemetry, safeGet, sanitizeErrorRecord, sanitizeLogRecord, sanitizeNormalized, sanitizeStack, sanitizeText, sanitizeUrl, sanitizeValue, setupTelemetry, severityForKind, syncTelemetry, timeoutErrorContextBuilder, topStackFrames, typeErrorContextBuilder, unregisterErrorContextBuilder, withErrorCapture };
+export { ADAPTERS, type AdapterDescriptor, type AdapterKind, type ApiClassification, ApiErrorContext, ApiErrorKind, CORRELATION_HEADERS, CleanupPolicy, DEFAULT_ALLOWED_QUERY_PARAMS, DEFAULT_ENV_PREFIXES, DEFAULT_OPTIONS, DIAGNOSTICS_CSV_COLUMNS, type DbConnection, type DiagnosticsExportOptions, type DiagnosticsExportResult, type DiagnosticsFormat, type DiagnosticsShortcutOptions, ERROR_CLEANUP_EVERY_WRITES, EXPORT_SLICE_SIZE, type EnvOptions, type ErrorCapturedEvent, ErrorCategory, ErrorContext, type ErrorContextBuilder, ErrorContextPatch, ErrorLocation, ErrorRecord, ErrorRepository, type ErrorRepositoryOptions, ErrorSeverity, ErrorSource, type ErrorsOptions, type EventEmitter, ExternalLogSource, type FetchFailure, type FetchRequestInfo, type FetchTransportOptions, type FingerprintInput, type FlushResult, FlushSummary, type GlobalHandlerOptions, type IdbCoreOptions, LOG_CLEANUP_EVERY_WRITES, LogLevel, LogLevelSetting, LogRecord, LogRepository, type LogRepositoryOptions, LogSink, type LogWrittenEvent, Logger, type LoggerController, type LogsOptions, MAX_ARRAY_ITEMS, MAX_CAUSE_DEPTH, MAX_COMPONENT_STACK_LENGTH, MAX_DEPTH, MAX_KEYS, MAX_LOG_ARGS, MAX_MESSAGE_LENGTH, MAX_STACK_LENGTH, MAX_STRING_LENGTH, MAX_TAGS, PRE_INIT_ERROR_BUFFER_SIZE, REDACTED, REPEAT_LIMITER_MAX_KEYS, REPORT_PRIVACY_BANNER, type RateLimiter, type RecordDroppedEvent, type RedactionOptions, RemoteTransport, type RepeatLimiter, type ReportMeta, type ReportPayload, type ResolvedErrorsOptions, type ResolvedLogsOptions, type ResolvedRedactionOptions, type ResolvedRestOptions, type ResolvedShortcutOptions, type ResolvedTelemetryOptions, type ResponseOutcome, RestBatchBody, type RestOptions, SENSITIVE_KEY_PATTERN, type Sanitizer, type SanitizerConfig, type SerialQueue, type ShortcutConfig, type ShortcutOptions, type SimpleTelemetryOptions, type SinkRegistration, type SinkRegistry, StorageFailureReason, type StorageMode, StorageState, type SyncCompletedEvent, type SyncFailedEvent, type SyncManager, type SyncManagerOptions, type SyncStartedEvent, SyncStatus, type TelemetryEvent, type TelemetryEventListener, type TelemetryEventMap, type TelemetryEventPayload, type TelemetryEventType, type TelemetryHandle, type TelemetryOptions, TelemetryRepository, type TelemetryState, type TelemetryStatus, UNHANDLED_SOURCES, UNNORMALIZABLE, adapterFor, adapterFrameworks, applyErrorContextPatch, buildApiErrorContext, buildFetchErrorContext, buildReportPayload, buildRestBody, byteLength, captureApiError, captureError, captureFetchError, categoryForKind, classifyResponse, classifyStorageError, clearErrorContextBuilders, clearTelemetryData, createDbConnection, createErrorRepository, createEventEmitter, createFetchTransport, createLogRepository, createLogger, createRateLimiter, createRepeatLimiter, createSanitizer, createSerialQueue, createSinkRegistry, createSyncManager, cyrb53, databaseNames, destroyTelemetry, diagnosticsFilename, encodeJsonForHtml, errorContextBuilderCount, escapeHtml, escapeJsonText, expectedCode, exportDiagnosticsReport, fingerprint, fingerprintParts, flushTelemetry, fromEnv, getDefaultSanitizer, getGlobal, getSinkRegistry, getState, getTelemetryStatus, globalHandlerCount, globalHandlersAttached, httpErrorContextBuilder, initTelemetry, installBuiltinContextBuilders, installDiagnosticsExportShortcut, installGlobalErrorHandlers, installShortcut, isAuthError, isBrowser, isEditableTarget, isErrorRecord, isExportInFlight, isLogRecord, isSensitiveKey, isSyncConfigured, isTelemetryInitialized, listErrorContextBuilders, logger, markAuthError, matchesShortcut, newId, newPageLoadId, normalizeError, normalizePathForFingerprint, promisifyRequest, reduceErrorPayload, reduceLogPayload, registerErrorContextBuilder, renderDiagnosticsReport, reportInternalFailure, reportInternalNote, resolveEndpoint, resolveEndpoints, resolveErrorContext, resolveOptions, retryFailedTelemetry, safeGet, sanitizeErrorRecord, sanitizeLogRecord, sanitizeNormalized, sanitizeStack, sanitizeText, sanitizeUrl, sanitizeValue, setupTelemetry, severityForKind, syncTelemetry, timeoutErrorContextBuilder, toError, topStackFrames, typeErrorContextBuilder, unregisterErrorContextBuilder, withChunkCapture, withErrorCapture };

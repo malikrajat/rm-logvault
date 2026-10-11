@@ -1,5 +1,5 @@
 import { ErrorHandler, Provider } from '@angular/core';
-import { E as ErrorContext } from './types-vgch86Bo.cjs';
+import { E as ErrorContext } from './types--hrpBzU7.cjs';
 
 /**
  * Angular adapter: an `ErrorHandler` implementation and a ready-made provider.

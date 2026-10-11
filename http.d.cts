@@ -1,4 +1,4 @@
-import { E as ErrorContext } from './types-vgch86Bo.cjs';
+import { E as ErrorContext } from './types--hrpBzU7.cjs';
 
 /**
  * A framework-agnostic HTTP client contract, and an adapter to the telemetry transport.

@@ -1,6 +1,6 @@
-import { R as RemoteTransport, b as TransportRequest, a as RestBatchBody } from './sync.types-C0RivCxN.cjs';
-import { a as ErrorRecord, M as Maybe } from './types-vgch86Bo.cjs';
-import { b as ErrorRepository, c as LogRepository, a as LogRecord, T as TelemetryRepository, g as StorageFailureReason } from './storage.types-BW8tLQEw.cjs';
+import { R as RemoteTransport, b as TransportRequest, a as RestBatchBody } from './sync.types-BBoZHZDA.cjs';
+import { a as ErrorRecord, M as Maybe, E as ErrorContext } from './types--hrpBzU7.cjs';
+import { b as ErrorRepository, c as LogRepository, a as LogRecord, T as TelemetryRepository, g as StorageFailureReason, f as LogLevel, e as Logger, d as LogSink, L as LogLevelSetting } from './storage.types-CNjOSust.cjs';
 
 /**
  * A scriptable transport for consumer tests.
@@ -138,4 +138,150 @@ interface MemoryRepository extends TelemetryRepository {
  */
 declare function createMemoryRepository(options?: MemoryRepositoryOptions): MemoryRepository;
 
-export { type FakeTransport, type FakeTransportOptions, type InspectableErrorRepository, type InspectableLogRepository, type MemoryRepository, type MemoryRepositoryOptions, createFakeTransport, createMemoryRepository };
+/**
+ * Ready-made spies for the two functions an application most often mocks.
+ *
+ * @remarks
+ * Almost every test suite that uses this library contains the same hand-rolled
+ * mock, and almost every hand-rolled version gets one of these wrong:
+ *
+ * ```ts
+ * // Wrong: the mock is module-scoped, so the second test file that imports it
+ * // appends to records the first one asserted on.
+ * export const captured: unknown[] = [];
+ * vi.mock('shared/telemetry', () => ({
+ *   captureError: (error: unknown) => captured.push(error),
+ * }));
+ *
+ * // Wrong: the shape is a bare `vi.fn()`, so a test that needs `ctx.tags` has to
+ * // reach into `mock.calls[0][1]` and cast.
+ * vi.mock('shared/telemetry', () => ({ captureError: vi.fn() }));
+ * ```
+ *
+ * These factories hand back a **recording** double with a typed inspection API and an
+ * explicit `reset()`, so a suite states what it is asserting on instead of unpacking
+ * a call tuple. Neither reaches the library's own state: importing the `/testing`
+ * subpath installs nothing, starts nothing and opens no database.
+ *
+ * @packageDocumentation
+ */
+
+/** One recorded `captureError` call. */
+interface CaptureErrorCall {
+    /** Exactly the value the caller passed. */
+    readonly error: unknown;
+    /** Exactly the context the caller passed, or `undefined`. */
+    readonly ctx: ErrorContext | undefined;
+    /**
+     * The normalised message, so a test can assert on a non-`Error` throw without
+     * reproducing the normaliser.
+     *
+     * @remarks
+     * Derived through the library's own `normalizeError`, which cannot throw — so
+     * recording a hostile value and then reading `messages()` is safe.
+     */
+    readonly message: string;
+}
+/** A recording stand-in for `captureError`. */
+interface CaptureErrorMock {
+    /** Pass this wherever the code under test expects `captureError`. */
+    readonly captureError: (error: unknown, ctx?: ErrorContext) => void;
+    /** Every call, in order. */
+    readonly calls: readonly CaptureErrorCall[];
+    /** The most recent call, or `undefined`. */
+    last(): Maybe<CaptureErrorCall>;
+    /** How many times it was called. */
+    count(): number;
+    /** The normalised message of every call, in order. */
+    messages(): readonly string[];
+    /** How many calls carried a `source`. */
+    withSource(source: string): readonly CaptureErrorCall[];
+    /** Drop every recorded call. */
+    reset(): void;
+}
+/**
+ * Create a recording `captureError` double.
+ *
+ * @returns a {@link CaptureErrorMock}
+ *
+ * @example
+ * ```ts
+ * import { describe, expect, it, vi } from 'vitest';
+ * import { createCaptureErrorMock } from '@codewithrajat/rm-logvault/testing';
+ *
+ * const telemetry = createCaptureErrorMock();
+ * vi.mock('shared/telemetry', () => ({ captureError: telemetry.captureError }));
+ *
+ * it('reports a failed load with its route', () => {
+ *   await loadOrders('42');
+ *   expect(telemetry.messages()).toEqual(['orders 42 not found']);
+ *   expect(telemetry.last()?.ctx?.source).toBe('router');
+ * });
+ * ```
+ */
+declare function createCaptureErrorMock(): CaptureErrorMock;
+/** One recorded logger call. */
+interface LogCall {
+    readonly level: LogLevel;
+    /** The message exactly as passed. */
+    readonly message: string;
+    /** The arguments exactly as passed, without the leading message. */
+    readonly args: readonly unknown[];
+}
+/** A recording stand-in for the `logger` facade. */
+interface LoggerMock {
+    /** Pass this wherever the code under test expects `logger`. */
+    readonly logger: Logger;
+    /** Every call, in order. */
+    readonly calls: readonly LogCall[];
+    /** Calls at one exact level. */
+    atLevel(level: LogLevel): readonly LogCall[];
+    /** Calls at `level` or above. */
+    atLeast(level: LogLevel): readonly LogCall[];
+    /** The most recent call, or `undefined`. */
+    last(): Maybe<LogCall>;
+    /** The message of every call, in order. */
+    messages(): readonly string[];
+    /** Sinks registered through `addSink`, still live. */
+    readonly sinks: readonly LogSink[];
+    /** Drop every recorded call and sink. */
+    reset(): void;
+}
+/** Options for {@link createLoggerMock}. */
+interface LoggerMockOptions {
+    /** Initial console level. Default `'warn'`, matching the real facade. */
+    readonly level?: Maybe<LogLevelSetting>;
+    /** Initial enabled flag. Default `true`. */
+    readonly enabled?: Maybe<boolean>;
+}
+/**
+ * Create a recording `logger` double.
+ *
+ * @param options - see {@link LoggerMockOptions}
+ * @returns a {@link LoggerMock}
+ *
+ * @remarks
+ * Unlike a bare spy, this implements the whole {@link Logger} contract, so it can be
+ * substituted anywhere the real facade is accepted:
+
+ * ```ts
+ * import { createLoggerMock } from '@codewithrajat/rm-logvault/testing';
+ * import { initTelemetry } from '@codewithrajat/rm-logvault';
+ *
+ * const { logger } = createLoggerMock();
+ * initTelemetry({ appName: 'test', logSource: { addSink: (sink) => logger.addSink(sink) } });
+ * ```
+ *
+ * `atLeast` uses the same level ladder the library does, so a test asserting
+ * "warn or above" cannot drift from the real filter.
+ *
+ * @example
+ * ```ts
+ * const { logger, messages } = createLoggerMock();
+ * logger.warn('[Checkout] retrying payment', { attempt: 2 });
+ * expect(messages()).toEqual(['[Checkout] retrying payment']);
+ * ```
+ */
+declare function createLoggerMock(options?: LoggerMockOptions): LoggerMock;
+
+export { type CaptureErrorCall, type CaptureErrorMock, type FakeTransport, type FakeTransportOptions, type InspectableErrorRepository, type InspectableLogRepository, type LogCall, type LoggerMock, type LoggerMockOptions, type MemoryRepository, type MemoryRepositoryOptions, createCaptureErrorMock, createFakeTransport, createLoggerMock, createMemoryRepository };

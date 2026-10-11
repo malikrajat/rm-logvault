@@ -101,6 +101,8 @@ The props that matter are `children`, `fallback` (a node, or `(error, reset) => 
 | You caught a failure and the user is fine | `captureError(error, ctx)` | It reports and returns instead of throwing. |
 | You want to report a wrong-but-not-fatal state | `captureError(error, ctx)` | Nothing was thrown to capture. |
 | A server component calls `logger.info(…)` | Nothing — it is fine, and it is server-only | It prints on the server; its buffered entry is discarded with that process. |
+| A `Worker` throws, or never answers | `attachWorker(worker, { name })` in a client component's effect | `Worker` does not exist on the server, and the events fire on the `Worker` object regardless. |
+| `next/dynamic` fails to load, and you catch it | `withChunkCapture(label, loader)` | The loader's own error path cannot name the view. |
 
 Note the last rows: `captureError` and `logger.*` are safe to call on the server, but "safe" does not mean
 "stored". Anything that needs the vault — the store, the outbox, the report — is client-only.

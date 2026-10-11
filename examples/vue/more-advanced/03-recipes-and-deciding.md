@@ -51,7 +51,9 @@ equivalent.
 | You want to report a wrong-but-not-fatal state | `captureError(error, ctx)` | Nothing was thrown to capture. |
 | You want Vue's own warnings in the store | The plugin's default `captureWarnings: true` | Nothing else sees a Vue warning. |
 | You want Vue's console output left completely alone | `captureWarnings: false` | That leaves `warnHandler` untouched, so errors are still recorded. |
-| You want records held on the device | The default `mode: 'local'` | No URL, no upload, no network egress at all. |
+| A `Worker` throws, or never answers | `attachWorker(worker, { name })` from `@codewithrajat/rm-logvault/worker` | No Vue hook sees it — the events fire on the `Worker` object, so nothing can attach for you. |
+| A lazy component fails to load, and you catch it | `withChunkCapture(route, loader)` | `defineAsyncComponent`'s own error path cannot name the screen. |
+| You want records held on the device | The default ``mode: 'local'`` | No URL, no upload, no network egress at all. |
 
 The first three rows are the point of the adapter: you write nothing and still get a record. The rows
 that need a call are the ones where the library cannot know something only you know.

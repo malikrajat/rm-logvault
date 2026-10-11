@@ -1,5 +1,5 @@
 import { App } from 'vue';
-import { E as ErrorContext } from './types-vgch86Bo.js';
+import { E as ErrorContext } from './types--hrpBzU7.js';
 
 /**
  * Vue 3 adapter: a plugin that installs `errorHandler` and `warnHandler`.

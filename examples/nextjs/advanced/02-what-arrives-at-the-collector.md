@@ -103,7 +103,7 @@ This is the record shape the recipes produce. The interesting columns are the la
   "source": "event-handler",
   "severity": "error",
   "category": "runtime",
-  "handled": false,
+  "handled": true,
   "thrownType": "error",
   "name": "Error",
   "message": "[checkout] order 8123 could not be submitted",
@@ -150,12 +150,14 @@ Two of these are worth a second look:
   are marked `failed` and not retried forever, and `rest.onTerminalFailure(status, records)` fires once
   per batch.
 
-> **Source note.** `severity` defaults to `'error'`, `handled` to `false` and `category` to `'runtime'`.
-> The React adapter is the one path that overrides the first two: `reactRootErrorHandlers()` returns
-> React 19's `onUncaughtError`, `onCaughtError` and `onRecoverableError`, and `onUncaughtError` sets
-> `severity: 'fatal'`, while the other two set `handled: true` — with a recoverable error downgraded to
-> `severity: 'warning'` and `tags: { recoverable: 'true' }`. So the same failure can be filed differently
-> depending on which React path reported it, and that is deliberate.
+> **Source note.** `severity` defaults to `'error'` and `category` to `'runtime'`; `handled` is **derived
+> from the `source`** as `!UNHANDLED_SOURCES.has(source)` — so it is `false` only for the global sources
+> (`'window'`, `'unhandledrejection'`, `'resource'`, `'chunk'`, `'csp'`, `'worker'`, `'timeout'`) and
+> `true` for `'react'`. `reactRootErrorHandlers()` overrides `severity` on two of its three paths:
+> `onUncaughtError` sets `'fatal'`, `onRecoverableError` sets `'warning'`, and the same one adds
+> `tags: { recoverable: 'true' }`. `onCaughtError` and `onRecoverableError` also set `handled: true`
+> explicitly; `onUncaughtError` does not, and derives `true` from its source. So the same failure can be
+> filed differently depending on which React path reported it, and that is deliberate.
 
 ## Watching the request leave, from a client component
 

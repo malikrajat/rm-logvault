@@ -15,7 +15,7 @@ at module top level. Importing is always safe; initializing is not.
 | [basic](./basic/README.md) | You want errors and logs recorded, with one call and no backend. | Nothing. This is the first thing to read. |
 | [advanced](./advanced/README.md) | Records should reach a collector, and you need to decide how much is kept. | The basic integration, working. |
 | [config](./config/README.md) | The same build has to behave differently per environment, without code changes. | A deployment worth configuring, and a `NEXT_PUBLIC_` convention you follow. |
-| [more-advanced](./more-advanced/README.md) | You need the SSR boundary's guarantees, or to replace the store or the transport. | Everything above, and a reason to. |
+| [more-advanced](./more-advanced/README.md) | You need the SSR boundary's guarantees, you own a `Worker`, or you want to replace the store or the transport. | Everything above, and a reason to. |
 
 ## Pages in each tier
 
@@ -24,7 +24,7 @@ at module top level. Importing is always safe; initializing is not.
 | [basic](./basic/README.md) | the `'use client'` provider and the SSR rule | [capture recipes](./basic/01-capture-recipes.md) — the four ways an error gets recorded on the client |
 | [advanced](./advanced/README.md) | uploads, retention and a route handler as the collector | [what arrives at your collector](./advanced/02-what-arrives-at-the-collector.md) |
 | [config](./config/README.md) | the options that matter and the `NEXT_PUBLIC_` prefix rule | [environment variables](./config/01-environment-variables.md), [levels and thresholds](./config/03-levels-and-thresholds.md) |
-| [more-advanced](./more-advanced/README.md) | the server boundary and the replaceable seams | [the server boundary](./more-advanced/01-framework-adapter.md), [the recipes and choosing between them](./more-advanced/03-recipes-and-deciding.md), [observing and extending](./more-advanced/04-observing-and-extending.md), [the HTTP client](./more-advanced/05-using-the-http-client.md), [encrypting stored records](./more-advanced/06-encrypting-stored-records.md) |
+| [more-advanced](./more-advanced/README.md) | the server boundary and the replaceable seams | [the server boundary](./more-advanced/01-framework-adapter.md), [the recipes and choosing between them](./more-advanced/03-recipes-and-deciding.md), [observing and extending](./more-advanced/04-observing-and-extending.md), [the HTTP client](./more-advanced/05-using-the-http-client.md), [encrypting stored records](./more-advanced/06-encrypting-stored-records.md), [workers and dynamic imports](./more-advanced/07-workers-and-dynamic-imports.md), [duplicates, floods and testing](./more-advanced/08-dedupe-throttling-and-testing.md) |
 
 ## Read them in this order
 

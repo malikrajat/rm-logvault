@@ -89,7 +89,28 @@ initTelemetry({
 | `sync:started` | `syncTelemetry()` begins, per kind | `kind`, `recordCount` |
 | `sync:completed` | a kind's upload pass finishes | `kind`, `uploaded`, `retried`, `failed` |
 | `sync:failed` | a kind had terminally-failed records | `kind`, `status`, `recordCount` |
-| `record:dropped` | the rate limiter discarded captures | `kind`, `reason`, `count` |
+| `record:dropped` | the rate limiter or the repeat throttle discarded captures | `kind`, `reason` (`'rate-limit'` \| `'repeat-limit'` \| `'consent'` \| `'payload-limit'` \| `'before-hook'`), `count` |
+
+`record:dropped` carries two reasons that mean **opposite** things, and it is worth routing them
+differently rather than alerting on the event as a whole:
+
+| `reason` | Emitted by | What it tells you |
+| --- | --- | --- |
+| `'rate-limit'` | the global `errors.maxEventsPerMinute` / `logs.maxLogsPerMinute` cap | The page produced more than the budget. Records are **genuinely missing**. |
+| `'repeat-limit'` | the per-fingerprint `errors.maxRepeatsPerMinute` cap | One failure repeated past its own cap. It is **already in the report**, and its budget went to failures nobody has seen yet. |
+
+```ts
+telemetry.events.on('record:dropped', (event) => {
+  if (event.reason === 'rate-limit') alertOnMissingRecords(event.count);
+  if (event.reason === 'repeat-limit') reportThrottledRepeat(event.count);
+});
+```
+
+`'consent'`, `'payload-limit'` and `'before-hook'` are in the type because a dropped record always
+deserves a reason, but no shipped code path emits them: consent drops silently by design, and the other
+two are reported through `onInternalError` instead. See
+[duplicates, floods and non-`Error` throws](./08-dedupe-throttling-and-testing.md) for the throttle in
+full.
 
 ```ts
 import { initTelemetry } from '@codewithrajat/rm-logvault';

@@ -116,12 +116,17 @@ For consumers evaluating the dependency:
   this repository and nothing else.
 - **No install scripts.** There is no `preinstall`, `install` or `postinstall` hook, so installing the
   package executes no code.
-- **Published with provenance.** `publishConfig.provenance` is `true`, so publishing from CI produces a
-  Sigstore-backed attestation linking the tarball to the workflow and commit that built it.
-- **`files` allow-list.** Only `dist`, `docs`, `README.md`, `CHANGELOG.md`, `CONTRIBUTING.md`,
-  `SECURITY.md`, `LICENSE`, `llms.txt` and `llms-full.txt` are published, and
-  `scripts/copy-extra-files.mjs` fails the build if any of them is missing or empty. No sources, no
-  tests, no configuration.
+- **No provenance attestation.** Releases are cut from a maintainer's checkout
+  ([D-032](docs/DECISIONS.md#d-032--releases-are-cut-from-a-checkout-and-the-release-workflow-is-gone)),
+  and npm can only produce a Sigstore attestation inside a supported CI provider, so a published
+  tarball carries none. Verify a release by integrity instead: `npm view @codewithrajat/rm-logvault
+  dist.integrity`, plus the registry's own `dist.signatures`.
+- **`files` allow-list.** Only `dist`, `docs`, `examples`, `README.md`, `CHANGELOG.md`,
+  `CONTRIBUTING.md`, `SECURITY.md`, `LICENSE`, `llms.txt` and `llms-full.txt` are published, and
+  `scripts/verify-package-files.mjs` fails the build if any of them is missing or empty, if the
+  packed tarball contains anything the allow-list does not cover, or if any path `main`, `types`,
+  `exports` or `typesVersions` promises is absent from the tarball. No sources, no tests, no
+  configuration.
 - **SBOM.** A CycloneDX SBOM is generated and validated on every run with `pnpm sbom`, and stored
   nowhere: CI deliberately retains no artifacts, so the SBOM is reproducible output rather than a
   file that can go stale.

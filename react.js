@@ -1412,5 +1412,3 @@ function useErrorCapture(context) {
 }
 
 export { TelemetryErrorBoundary, reactRootErrorHandlers, useErrorCapture };
-//# sourceMappingURL=react.js.map
-//# sourceMappingURL=react.js.map

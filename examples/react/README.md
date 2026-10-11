@@ -30,7 +30,7 @@ root's error callbacks rather than by `window.onerror`.
 | [basic](./basic/README.md) | the integration, in one block | [capture recipes](./basic/01-capture-recipes.md) — the four ways an error gets recorded |
 | [advanced](./advanced/README.md) | uploads and retention | [what arrives at your collector](./advanced/02-what-arrives-at-the-collector.md), [export and manual sync](./advanced/01-export-and-manual-sync.md) |
 | [config](./config/README.md) | the options that matter | [environment variables](./config/01-environment-variables.md), [levels and thresholds](./config/03-levels-and-thresholds.md) |
-| [more-advanced](./more-advanced/README.md) | the adapter, indexed | [the adapter and testing](./more-advanced/01-the-react-adapter-and-testing.md), [the seams](./more-advanced/02-repository-transport-and-hooks.md), [the recipes and choosing between them](./more-advanced/03-recipes-and-deciding.md), [observing and extending](./more-advanced/04-observing-and-extending.md), [using the HTTP client](./more-advanced/05-using-the-http-client.md), [encrypting stored records](./more-advanced/06-encrypting-stored-records.md) |
+| [more-advanced](./more-advanced/README.md) | the adapter, indexed | [the adapter and testing](./more-advanced/01-the-react-adapter-and-testing.md), [the seams](./more-advanced/02-repository-transport-and-hooks.md), [the recipes and choosing between them](./more-advanced/03-recipes-and-deciding.md), [observing and extending](./more-advanced/04-observing-and-extending.md), [using the HTTP client](./more-advanced/05-using-the-http-client.md), [encrypting stored records](./more-advanced/06-encrypting-stored-records.md), [workers and dynamic imports](./more-advanced/07-workers-and-dynamic-imports.md), [duplicates, floods and testing](./more-advanced/08-dedupe-throttling-and-testing.md) |
 
 ## Read them in this order
 
@@ -55,8 +55,10 @@ root's error callbacks rather than by `window.onerror`.
 5. **Beyond the recorder**, in this order:
    [observing and extending](./more-advanced/04-observing-and-extending.md) (events, context builders,
    sinks, export formats) → [using the HTTP client](./more-advanced/05-using-the-http-client.md) →
-   [encrypting stored records](./more-advanced/06-encrypting-stored-records.md). The first is needed to
-   follow the other two, and all three are optional.
+   [encrypting stored records](./more-advanced/06-encrypting-stored-records.md) ?
+   [workers and dynamic imports](./more-advanced/07-workers-and-dynamic-imports.md) ?
+   [duplicates, floods and testing](./more-advanced/08-dedupe-throttling-and-testing.md). The first is
+   needed to follow the rest, and all of them are optional.
 
 ## What is React-specific here, and what is not
 
@@ -79,9 +81,10 @@ the matching vanilla page rather than repeating it.
 - A `> Source note.` block marks a place where the behaviour is narrower than the name suggests.
 - Every option mentioned exists in `src/core/config.ts`; the exhaustive reference is
   [docs/API.md](../../docs/API.md#every-option-annotated).
-- Import specifiers are the core entry unless the line says otherwise. The two optional subpaths are
-  `@codewithrajat/rm-logvault/http` and `@codewithrajat/rm-logvault/storage`, and importing them is always
-  a deliberate choice — an application that does not use them pays nothing for them.
+- Import specifiers are the core entry unless the line says otherwise. The three optional subpaths are
+  `@codewithrajat/rm-logvault/http`, `@codewithrajat/rm-logvault/storage` and
+  `@codewithrajat/rm-logvault/worker`, and importing them is always a deliberate choice — an application
+  that does not use them pays nothing for them.
 
 ## Other frameworks
 

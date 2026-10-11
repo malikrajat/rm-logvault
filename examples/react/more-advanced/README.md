@@ -67,10 +67,18 @@ Both are separate entry points, so an application that does not import them pays
 | --- | --- | --- |
 | `@codewithrajat/rm-logvault/http` | A `fetch` HTTP client, its contract, and auth header helpers. | [using the HTTP client](./05-using-the-http-client.md) |
 | `@codewithrajat/rm-logvault/storage` | Encryption providers and a repository wrapper. | [encrypting stored records](./06-encrypting-stored-records.md) |
+| `@codewithrajat/rm-logvault/worker` | `attachWorker`, for a `Worker` whose `error` and `messageerror` events never reach `window`. | [workers and dynamic imports](./07-workers-and-dynamic-imports.md) |
 
 > **Source note.** The `/http` client is the **one** public surface in the package allowed to reject by
 > design, because an HTTP client that cannot report a failure is useless. It is walled off from the capture
 > path — nothing in the core imports it — so the library's own never-throw guarantee is unaffected.
+
+## Two things React makes you decide
+
+| Page | The React-specific question it answers |
+| --- | --- |
+| [workers and dynamic imports](./07-workers-and-dynamic-imports.md) | Where an `attachWorker` call belongs when StrictMode double-invokes your effects, and where `withChunkCapture` goes inside `React.lazy`. |
+| [duplicates, floods and testing](./08-dedupe-throttling-and-testing.md) | What happens when `reactRootErrorHandlers` and your own `catch` capture the same error, and the doubles to use instead of hand-rolling `vi.mock`. |
 
 ## See also
 
@@ -80,6 +88,10 @@ Both are separate entry points, so an application that does not import them pays
   formats.
 - [using the HTTP client](./05-using-the-http-client.md) and
   [encrypting stored records](./06-encrypting-stored-records.md) — the two new subpaths.
+- [workers and dynamic imports](./07-workers-and-dynamic-imports.md) — the two capture paths a global
+  handler cannot reach.
+- [duplicates, floods and testing](./08-dedupe-throttling-and-testing.md) — enrichment, throttling and
+  the test doubles.
 - [config](../config/README.md) — the options these hooks sit alongside, including the flat aliases.
 - [../../vanilla/more-advanced/README.md](../../vanilla/more-advanced/README.md) — the seams in depth.
 - [docs/ARCHITECTURE.md](../../../docs/ARCHITECTURE.md) — how the pieces fit.

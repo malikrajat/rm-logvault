@@ -31,7 +31,8 @@ Nothing here is required. `initTelemetry()` with no arguments is a valid, fully-
 | `maxRecords` | rows | `500` | Count cap; oldest surplus deleted. `0` is rejected. |
 | `retentionDays` | days | `7` | Age cap. **`0` disables it.** Fractions allowed. |
 | `maxPayloadBytes` | UTF-8 bytes per record | `16384` | Per-record budget; starts the reduction ladder. |
-| `maxEventsPerMinute` | events / 60 s | `120` | Rate limit. `0` disables it. |
+| `maxEventsPerMinute` | events / 60 s | `120` | Global rate limit. `0` disables it. |
+| `maxRepeatsPerMinute` | records per fingerprint / 60 s | `12` | Per-failure cap, checked **before** the global one, so a refused repeat costs no global budget. `0` disables it. |
 | `preventDefaultUnhandledRejection` | `boolean` | `false` | `true` silences the browser's own console error for unhandled rejections. |
 | `captureResources` | `boolean` | `false` | Also record `<img>`/`<script>`/`<link>` load failures. |
 | `captureCsp` | `boolean` | `false` | Also record `securitypolicyviolation`. |

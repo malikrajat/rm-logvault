@@ -200,6 +200,12 @@ function fromEnv(prefix = DEFAULT_ENV_PREFIXES) {
       integer: true
     })
   );
+  set(
+    "errorsMaxRepeatsPerMinute",
+    parseNumber(lookupEnv("ERROR_TRACKING_MAX_REPEATS_PER_MINUTE", prefixes, meta, proc), {
+      integer: true
+    })
+  );
   const consoleLevel = lookupEnv("LOG_LEVEL", prefixes, meta, proc);
   const persistLevel = lookupNamed(
     "LOG_PERSIST_LEVEL",
@@ -394,7 +400,8 @@ var UNHANDLED_SOURCES = /* @__PURE__ */ new Set([
   "resource",
   "chunk",
   "csp",
-  "worker"
+  "worker",
+  "timeout"
 ]);
 function truncationSuffix(dropped) {
   return `\u2026[truncated ${String(dropped)}]`;
@@ -1487,6 +1494,57 @@ function createRateLimiter(maxPerWindow, onWindowRoll) {
     }
   };
 }
+var REPEAT_LIMITER_MAX_KEYS = 500;
+function createRepeatLimiter(maxPerKey, onWindowRoll, maxKeys = REPEAT_LIMITER_MAX_KEYS) {
+  const limit = typeof maxPerKey === "number" && Number.isFinite(maxPerKey) && maxPerKey > 0 ? Math.floor(maxPerKey) : 0;
+  const keyCap = typeof maxKeys === "number" && Number.isFinite(maxKeys) && maxKeys > 0 ? Math.floor(maxKeys) : REPEAT_LIMITER_MAX_KEYS;
+  const counts = /* @__PURE__ */ new Map();
+  let windowStart = now();
+  let droppedCount = 0;
+  const roll = (current) => {
+    if (current - windowStart < RATE_LIMIT_WINDOW_MS) return;
+    if (droppedCount > 0 && onWindowRoll !== void 0) {
+      try {
+        onWindowRoll(droppedCount);
+      } catch {
+      }
+    }
+    windowStart = current;
+    counts.clear();
+    droppedCount = 0;
+  };
+  return {
+    blocked: (key) => {
+      try {
+        if (limit <= 0) return false;
+        roll(now());
+        if ((counts.get(key) ?? 0) >= limit) {
+          droppedCount += 1;
+          return true;
+        }
+        return false;
+      } catch {
+        return false;
+      }
+    },
+    record: (key) => {
+      try {
+        if (limit <= 0) return;
+        const count = counts.get(key) ?? 0;
+        if (count === 0 && counts.size >= keyCap) return;
+        counts.set(key, count + 1);
+      } catch {
+      }
+    },
+    dropped: () => droppedCount,
+    tracked: () => counts.size,
+    reset: () => {
+      counts.clear();
+      windowStart = now();
+      droppedCount = 0;
+    }
+  };
+}
 
 // src/errors/apiContext.ts
 var CORRELATION_HEADERS = [
@@ -1908,6 +1966,131 @@ function fingerprint(input) {
   }
 }
 
+// src/errors/contextPatch.ts
+var SEVERITIES = /* @__PURE__ */ new Set(["fatal", "error", "warning", "info"]);
+var MAX_SOURCE_LENGTH = 40;
+function sanitizeTags(tags) {
+  if (tags === void 0) return void 0;
+  const sanitizer = getDefaultSanitizer();
+  const out = {};
+  let count = 0;
+  try {
+    for (const [key, value] of Object.entries(tags)) {
+      if (count >= MAX_TAGS) break;
+      const safeKey = sanitizer.text(key, MAX_TAG_KEY_LENGTH);
+      if (safeKey.length === 0) continue;
+      out[safeKey] = sanitizer.text(
+        typeof value === "string" ? value : String(value),
+        MAX_TAG_VALUE_LENGTH
+      );
+      count += 1;
+    }
+  } catch {
+    return void 0;
+  }
+  return count > 0 ? out : void 0;
+}
+function sanitizeExtra(extra) {
+  if (extra === void 0) return void 0;
+  try {
+    const sanitized = getDefaultSanitizer().value(extra);
+    if (sanitized !== null && typeof sanitized === "object" && !Array.isArray(sanitized)) {
+      const entries = Object.entries(sanitized);
+      return entries.length > 0 ? sanitized : void 0;
+    }
+    return void 0;
+  } catch {
+    return void 0;
+  }
+}
+function contextPatchFrom(ctx, sourceExplicit) {
+  try {
+    if (ctx === void 0) return null;
+    const severityValue = ctx.severity;
+    const severity = typeof severityValue === "string" && SEVERITIES.has(severityValue) ? severityValue : void 0;
+    const sourceValue = ctx.source;
+    const source = !sourceExplicit && typeof sourceValue === "string" && sourceValue.length > 0 && sourceValue.length <= MAX_SOURCE_LENGTH ? sourceValue : void 0;
+    const tags = sanitizeTags(ctx.tags);
+    const extra = sanitizeExtra(ctx.extra);
+    if (severity === void 0 && source === void 0 && tags === void 0 && extra === void 0) {
+      return null;
+    }
+    const patch = {};
+    if (source !== void 0) patch.source = source;
+    if (severity !== void 0) patch.severity = severity;
+    if (tags !== void 0) patch.tags = tags;
+    if (extra !== void 0) patch.extra = extra;
+    return patch;
+  } catch {
+    return null;
+  }
+}
+function applyErrorContextPatch(record, patch) {
+  try {
+    let changed = false;
+    const next = { ...record };
+    const severity = patch.severity;
+    if (severity !== void 0 && severity !== record.severity) {
+      next.severity = severity;
+      changed = true;
+    }
+    const tags = patch.tags;
+    if (tags !== void 0) {
+      const merged = { ...record.tags ?? {} };
+      let added = false;
+      for (const [key, value] of Object.entries(tags)) {
+        if (Object.keys(merged).length >= MAX_TAGS && merged[key] === void 0) break;
+        if (merged[key] !== value) {
+          merged[key] = value;
+          added = true;
+        }
+      }
+      if (added) {
+        next.tags = merged;
+        changed = true;
+      }
+    }
+    const extra = patch.extra;
+    if (extra !== void 0) {
+      const merged = { ...record.extra ?? {} };
+      let added = false;
+      let count = Object.keys(merged).length;
+      for (const [key, value] of Object.entries(extra)) {
+        if (count >= MAX_KEYS && merged[key] === void 0) break;
+        if (merged[key] !== value) {
+          merged[key] = value;
+          added = true;
+        }
+        count += 1;
+      }
+      if (added) {
+        next.extra = merged;
+        changed = true;
+      }
+    }
+    const source = patch.source;
+    if (source !== void 0 && source !== record.source) {
+      next.source = source;
+      next.fingerprint = fingerprint({
+        source,
+        category: record.category,
+        name: record.name,
+        message: record.message,
+        stack: record.stack ?? void 0,
+        componentStack: record.componentStack ?? void 0,
+        route: record.page.route,
+        api: record.api ?? void 0,
+        event: record.event ?? void 0,
+        location: record.location ?? void 0
+      });
+      changed = true;
+    }
+    return changed ? next : null;
+  } catch {
+    return null;
+  }
+}
+
 // src/errors/normalize.ts
 var MAX_SUMMARY_LENGTH = 200;
 var NON_ERROR_OBJECT_NAME = "NonErrorObject";
@@ -2305,53 +2488,28 @@ function setCaptureSuppressed(value) {
     reportInternalFailure("capture-suppression", failure);
   }
 }
-function sanitizeTags(tags) {
-  if (tags === void 0) return void 0;
-  const sanitizer = getDefaultSanitizer();
-  const out = {};
-  let count = 0;
-  try {
-    for (const [key, value] of Object.entries(tags)) {
-      if (count >= MAX_TAGS) break;
-      const safeKey = sanitizer.text(key, MAX_TAG_KEY_LENGTH);
-      if (safeKey.length === 0) continue;
-      out[safeKey] = sanitizer.text(
-        typeof value === "string" ? value : String(value),
-        MAX_TAG_VALUE_LENGTH
-      );
-      count += 1;
-    }
-  } catch {
-    return void 0;
-  }
-  return count > 0 ? out : void 0;
-}
-function sanitizeExtra(extra) {
-  if (extra === void 0) return void 0;
-  try {
-    const sanitized = getDefaultSanitizer().value(extra);
-    if (sanitized !== null && typeof sanitized === "object" && !Array.isArray(sanitized)) {
-      const entries = Object.entries(sanitized);
-      return entries.length > 0 ? sanitized : void 0;
-    }
-    return void 0;
-  } catch {
-    return void 0;
-  }
-}
 function isThenable(value) {
   return value !== null && (typeof value === "object" || typeof value === "function") && typeof value.then === "function";
 }
 function createErrorTracker(trackerOptions) {
   const { repository, options: config } = trackerOptions;
   const queue = createSerialQueue();
-  const seen = /* @__PURE__ */ new WeakSet();
+  const seen = /* @__PURE__ */ new WeakMap();
   const listeners = /* @__PURE__ */ new Set();
   let capturing = false;
   let destroyed = false;
   const limiter = createRateLimiter(config.errors.maxEventsPerMinute, (dropped) => {
     reportInternalNote("rate-limit", `${String(dropped)} dropped`);
   });
+  const repeats = createRepeatLimiter(
+    config.errors.maxRepeatsPerMinute,
+    (dropped) => {
+      reportInternalNote(
+        "repeat-limit",
+        `${String(dropped)} repeat(s) of already-reported failures dropped this window`
+      );
+    }
+  );
   const consentGranted = () => {
     const consent = config.consent;
     if (consent === void 0) return true;
@@ -2439,17 +2597,26 @@ function createErrorTracker(trackerOptions) {
     if (extra !== void 0) record.extra = extra;
     return record;
   };
+  const repeatKey = (normalized, ctx) => [
+    ctx?.source ?? "manual",
+    normalized.name,
+    normalized.message,
+    topStackFrames(normalized.stack, 1)
+  ].join("\u241F");
   const ingest = (normalized, ctx, timestamp) => {
-    if (destroyed) return;
-    if (!config.errors.enabled) return;
-    if (!consentGranted()) return;
-    if (!limiter.allow()) return;
+    if (destroyed) return null;
+    if (!config.errors.enabled) return null;
+    if (!consentGranted()) return null;
+    const key = repeatKey(normalized, ctx);
+    if (repeats.blocked(key)) return null;
+    if (!limiter.allow()) return null;
+    repeats.record(key);
     let record = buildRecord(normalized, ctx, timestamp);
     const beforeCapture = config.errors.beforeCapture;
     if (beforeCapture !== void 0) {
       try {
         const replacement = beforeCapture(record);
-        if (replacement === null) return;
+        if (replacement === null) return null;
         record = replacement;
       } catch (error) {
         reportInternalFailure("beforeCapture", error);
@@ -2461,7 +2628,7 @@ function createErrorTracker(trackerOptions) {
         "payload-limit",
         new Error("error record exceeded its payload budget at every reduction tier")
       );
-      return;
+      return null;
     }
     void queue.push(() => repository.save(fitted)).then((result) => {
       if (result !== void 0 && !result.ok) {
@@ -2469,6 +2636,21 @@ function createErrorTracker(trackerOptions) {
       }
     });
     emitRecord(fitted);
+    return fitted;
+  };
+  const mergeInto = (entry, ctx) => {
+    if (ctx === void 0) return;
+    const patch = contextPatchFrom(ctx, entry.sourceExplicit);
+    if (patch === null) return;
+    void queue.push(() => {
+      const merge = repository.mergeContext;
+      if (typeof merge !== "function") return void 0;
+      return merge.call(repository, entry.id, patch);
+    }).then((result) => {
+      if (result !== void 0 && !result.ok) {
+        reportInternalFailure("context-merge", result.reason);
+      }
+    });
   };
   const acquire = () => {
     if (capturing) return false;
@@ -2479,15 +2661,24 @@ function createErrorTracker(trackerOptions) {
     capture: (error, ctx) => {
       try {
         if (destroyed || !config.errors.enabled) return;
-        if (error !== null && (typeof error === "object" || typeof error === "function")) {
-          const object = error;
-          if (seen.has(object)) return;
-          seen.add(object);
+        const object = error !== null && (typeof error === "object" || typeof error === "function") ? error : null;
+        if (object !== null) {
+          const entry = seen.get(object);
+          if (entry !== void 0) {
+            mergeInto(entry, ctx);
+            return;
+          }
         }
         if (!acquire()) return;
         try {
           const enriched = resolveErrorContext(error, ctx);
-          ingest(normalizeError(error), enriched, enriched.timestamp ?? now());
+          const record = ingest(normalizeError(error), enriched, enriched.timestamp ?? now());
+          if (object !== null && record !== null) {
+            seen.set(object, {
+              id: record.id,
+              sourceExplicit: enriched.source !== void 0
+            });
+          }
         } finally {
           capturing = false;
         }
@@ -2517,10 +2708,13 @@ function createErrorTracker(trackerOptions) {
       };
     },
     droppedByRateLimit: () => limiter.dropped(),
+    droppedByRepeat: () => repeats.dropped(),
     destroy: () => {
       destroyed = true;
       listeners.clear();
       queue.clear();
+      limiter.reset();
+      repeats.reset();
     },
     flush: async () => {
       await queue.drain();
@@ -2924,6 +3118,8 @@ var DEFAULT_OPTIONS = {
     retentionDays: 7,
     maxPayloadBytes: 16384,
     maxEventsPerMinute: 120,
+    /** A tenth of `maxEventsPerMinute`, so one failure cannot own the whole budget. */
+    maxRepeatsPerMinute: 12,
     preventDefaultUnhandledRejection: false,
     captureResources: false,
     captureCsp: false,
@@ -3082,6 +3278,11 @@ function resolveOptionsUnsafe(options) {
       DEFAULT_OPTIONS.errors.maxEventsPerMinute,
       { allowZero: true, integer: true }
     ),
+    maxRepeatsPerMinute: positiveNumber(
+      errorsIn.maxRepeatsPerMinute ?? env?.errorsMaxRepeatsPerMinute,
+      DEFAULT_OPTIONS.errors.maxRepeatsPerMinute,
+      { allowZero: true, integer: true }
+    ),
     allowedQueryParams: errorAllowedQueryParams ?? [],
     preventDefaultUnhandledRejection: errorsIn.preventDefaultUnhandledRejection ?? DEFAULT_OPTIONS.errors.preventDefaultUnhandledRejection,
     captureResources: errorsIn.captureResources ?? DEFAULT_OPTIONS.errors.captureResources,
@@ -3233,6 +3434,7 @@ var DEFAULT_RESOLVED = Object.freeze({
     retentionDays: DEFAULT_OPTIONS.errors.retentionDays,
     maxPayloadBytes: DEFAULT_OPTIONS.errors.maxPayloadBytes,
     maxEventsPerMinute: DEFAULT_OPTIONS.errors.maxEventsPerMinute,
+    maxRepeatsPerMinute: DEFAULT_OPTIONS.errors.maxRepeatsPerMinute,
     allowedQueryParams: [],
     preventDefaultUnhandledRejection: DEFAULT_OPTIONS.errors.preventDefaultUnhandledRejection,
     captureResources: DEFAULT_OPTIONS.errors.captureResources,
@@ -5371,6 +5573,23 @@ function createErrorRepository(options) {
       return { ok: true, value: void 0 };
     },
     save,
+    /**
+     * Enrich one `pending` row in a single `readwrite` transaction.
+     *
+     * @remarks
+     * Read-then-write inside one transaction, so two tabs enriching the same record
+     * cannot lose each other's tags. A row that is not `pending` is returned as `null`
+     * and left alone: `uploading` means a request already holds it, and `failed` means
+     * the upload outcome is settled.
+     */
+    mergeContext: async (id, patch) => connection.transaction("readwrite", async (store) => {
+      const raw = await promisifyRequest(store.get(id));
+      if (!isErrorRecord(raw) || raw.uploadStatus !== "pending") return void 0;
+      const merged = applyErrorContextPatch(raw, patch);
+      if (merged === null) return raw;
+      await promisifyRequest(store.put(merged));
+      return merged;
+    }),
     get: async (id) => connection.transaction("readonly", async (store) => {
       const raw = await promisifyRequest(store.get(id));
       return isErrorRecord(raw) ? raw : void 0;
@@ -6376,7 +6595,7 @@ function setupTelemetry(options = {}) {
 }
 var active2 = null;
 var currentEmitter = null;
-var reportedDrops = { errors: 0, logs: 0 };
+var reportedDrops = { errors: 0, logs: 0, repeats: 0 };
 function emitEvent(event) {
   currentEmitter?.emit(event);
 }
@@ -6431,12 +6650,14 @@ function emitSyncOutcome(kind, summary) {
     emitEvent(failed);
   }
 }
-function emitDroppedByRateLimit(errors, logs) {
+function emitDroppedByRateLimit(errors, logs, repeats = 0) {
   const timestamp = Date.now();
   const errorDelta = Math.max(0, Math.floor(errors) - reportedDrops.errors);
   const logDelta = Math.max(0, Math.floor(logs) - reportedDrops.logs);
+  const repeatDelta = Math.max(0, Math.floor(repeats) - reportedDrops.repeats);
   reportedDrops.errors = Math.max(reportedDrops.errors, Math.floor(errors));
   reportedDrops.logs = Math.max(reportedDrops.logs, Math.floor(logs));
+  reportedDrops.repeats = Math.max(reportedDrops.repeats, Math.floor(repeats));
   if (errorDelta > 0) {
     const event = {
       type: "record:dropped",
@@ -6454,6 +6675,16 @@ function emitDroppedByRateLimit(errors, logs) {
       kind: "logs",
       reason: "rate-limit",
       count: logDelta
+    };
+    emitEvent(event);
+  }
+  if (repeatDelta > 0) {
+    const event = {
+      type: "record:dropped",
+      timestamp,
+      kind: "errors",
+      reason: "repeat-limit",
+      count: repeatDelta
     };
     emitEvent(event);
   }
@@ -6547,7 +6778,7 @@ function initTelemetry(options = {}) {
     resetInternalFailures();
     const resolved = resolveOptions(options);
     state.options = resolved;
-    reportedDrops = { errors: 0, logs: 0 };
+    reportedDrops = { errors: 0, logs: 0, repeats: 0 };
     const emitter = createEventEmitter();
     currentEmitter = emitter;
     state.eventEmitter = emitter;
@@ -6771,7 +7002,8 @@ function destroyTelemetry() {
     if (installation !== null) {
       emitDroppedByRateLimit(
         installation.errorTracker.droppedByRateLimit(),
-        installation.logTracker.droppedByRateLimit()
+        installation.logTracker.droppedByRateLimit(),
+        installation.errorTracker.droppedByRepeat()
       );
     }
     currentEmitter?.clear();
@@ -6835,7 +7067,8 @@ async function syncTelemetry() {
     await refreshPendingCounts();
     emitDroppedByRateLimit(
       installation.errorTracker.droppedByRateLimit(),
-      installation.logTracker.droppedByRateLimit()
+      installation.logTracker.droppedByRateLimit(),
+      installation.errorTracker.droppedByRepeat()
     );
     return result;
   } catch (error) {
@@ -6881,6 +7114,7 @@ function getTelemetryStatus() {
       online: isOnline(),
       pending: { errors: state.pendingErrors, logs: state.pendingLogs },
       droppedByRateLimit: (installation?.errorTracker.droppedByRateLimit() ?? 0) + (installation?.logTracker.droppedByRateLimit() ?? 0),
+      droppedByRepeat: installation?.errorTracker.droppedByRepeat() ?? 0,
       lastSync: installation?.syncManager.lastSync(),
       syncStatus: installation?.syncManager.status() ?? "idle"
     };
@@ -6892,6 +7126,7 @@ function getTelemetryStatus() {
       online: true,
       pending: { errors: 0, logs: 0 },
       droppedByRateLimit: 0,
+      droppedByRepeat: 0,
       lastSync: void 0,
       syncStatus: "idle"
     };
@@ -6968,6 +7203,17 @@ var ADAPTERS = /* @__PURE__ */ Object.freeze([
     exports: ["instrumentFetch", "registerTelemetryUrl", "InstrumentFetchOptions"],
     description: "A fetch wrapper that captures a failure and rethrows the original value.",
     kind: "http-client"
+  },
+  {
+    key: "worker",
+    name: "Worker",
+    framework: "core",
+    entryPoint: "@codewithrajat/rm-logvault/worker",
+    inCore: false,
+    targets: "any Worker, SharedWorker or MessagePort",
+    exports: ["attachWorker", "AttachWorkerOptions", "WorkerAttachment"],
+    description: "Attaches error and messageerror capture to a Worker, plus a silence timeout.",
+    kind: "framework"
   },
   {
     key: "react-query",
@@ -7060,6 +7306,81 @@ function adapterFor(key) {
 }
 function adapterFrameworks() {
   return [...new Set(ADAPTERS.map((adapter) => adapter.framework))].sort();
+}
+
+// src/errors/chunkCapture.ts
+function captureChunkFailure(error, route, ctx) {
+  captureError(error, {
+    ...ctx ?? {},
+    source: ctx?.source ?? "chunk",
+    category: ctx?.category ?? "chunk",
+    severity: ctx?.severity ?? "fatal",
+    // Re-thrown to the caller, so the application did not handle it here.
+    handled: ctx?.handled ?? false,
+    tags: { ...ctx?.tags ?? {}, route }
+  });
+}
+function withChunkCapture(route, loader, ctx) {
+  const label = typeof route === "string" && route.length > 0 ? route : "unknown";
+  return async () => {
+    try {
+      return await loader();
+    } catch (error) {
+      captureChunkFailure(error, label, ctx);
+      throw error;
+    }
+  };
+}
+
+// src/errors/toError.ts
+function isSameRealmError(value) {
+  try {
+    const ctor = Reflect.get(globalThis, "Error");
+    return typeof ctor === "function" && value instanceof ctor;
+  } catch {
+    return false;
+  }
+}
+function isErrorLike3(value) {
+  try {
+    const message = Reflect.get(value, "message");
+    if (typeof message !== "string") return false;
+    const name = Reflect.get(value, "name");
+    const stack = Reflect.get(value, "stack");
+    return typeof name === "string" || typeof stack === "string";
+  } catch {
+    return false;
+  }
+}
+var FALLBACK_ERROR = new Error("Unreportable value");
+function toError(value) {
+  try {
+    if (value !== null && (typeof value === "object" || typeof value === "function")) {
+      const object = value;
+      if (isSameRealmError(object) || isErrorLike3(object)) return value;
+    }
+  } catch {
+  }
+  try {
+    const normalized = normalizeError(value);
+    const error = new Error(normalized.message.slice(0, MAX_MESSAGE_LENGTH));
+    try {
+      if (normalized.name.length > 0) error.name = normalized.name;
+    } catch {
+    }
+    try {
+      Object.defineProperty(error, "cause", {
+        value,
+        writable: true,
+        enumerable: false,
+        configurable: true
+      });
+    } catch {
+    }
+    return error;
+  } catch {
+    return FALLBACK_ERROR;
+  }
 }
 
 // src/errors/builtinContextBuilders.ts
@@ -7191,6 +7512,7 @@ exports.MAX_TAGS = MAX_TAGS;
 exports.PRE_INIT_ERROR_BUFFER_SIZE = PRE_INIT_ERROR_BUFFER_SIZE;
 exports.PRE_INIT_LOG_BUFFER_SIZE = PRE_INIT_LOG_BUFFER_SIZE;
 exports.REDACTED = REDACTED;
+exports.REPEAT_LIMITER_MAX_KEYS = REPEAT_LIMITER_MAX_KEYS;
 exports.REPORT_PRIVACY_BANNER = REPORT_PRIVACY_BANNER;
 exports.SENSITIVE_KEY_PATTERN = SENSITIVE_KEY_PATTERN;
 exports.TERMINAL_STATUSES = TERMINAL_STATUSES;
@@ -7198,6 +7520,7 @@ exports.UNHANDLED_SOURCES = UNHANDLED_SOURCES;
 exports.UNNORMALIZABLE = UNNORMALIZABLE;
 exports.adapterFor = adapterFor;
 exports.adapterFrameworks = adapterFrameworks;
+exports.applyErrorContextPatch = applyErrorContextPatch;
 exports.backoffDelay = backoffDelay;
 exports.buildApiErrorContext = buildApiErrorContext;
 exports.buildFetchErrorContext = buildFetchErrorContext;
@@ -7219,6 +7542,7 @@ exports.createFetchTransport = createFetchTransport;
 exports.createLogRepository = createLogRepository;
 exports.createLogger = createLogger;
 exports.createRateLimiter = createRateLimiter;
+exports.createRepeatLimiter = createRepeatLimiter;
 exports.createSanitizer = createSanitizer;
 exports.createSerialQueue = createSerialQueue;
 exports.createSinkRegistry = createSinkRegistry;
@@ -7294,9 +7618,9 @@ exports.setupTelemetry = setupTelemetry;
 exports.severityForKind = severityForKind;
 exports.syncTelemetry = syncTelemetry;
 exports.timeoutErrorContextBuilder = timeoutErrorContextBuilder;
+exports.toError = toError;
 exports.topStackFrames = topStackFrames;
 exports.typeErrorContextBuilder = typeErrorContextBuilder;
 exports.unregisterErrorContextBuilder = unregisterErrorContextBuilder;
+exports.withChunkCapture = withChunkCapture;
 exports.withErrorCapture = withErrorCapture;
-//# sourceMappingURL=index.cjs.map
-//# sourceMappingURL=index.cjs.map

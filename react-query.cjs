@@ -1417,5 +1417,3 @@ function attachQueryClient(queryClient) {
 }
 
 exports.attachQueryClient = attachQueryClient;
-//# sourceMappingURL=react-query.cjs.map
-//# sourceMappingURL=react-query.cjs.map

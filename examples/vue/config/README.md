@@ -56,7 +56,7 @@ A typo must never be able to change behaviour into something worse:
 - A non-numeric, `NaN`, `Infinity` or negative numeric is **ignored** and the default is used.
 - `maxRecords: 0` is treated as a **mistake**, not as "store nothing" — silently disabling retention is
   the surprising outcome. Store nothing with `errors.enabled: false` instead.
-- `0` **is** meaningful for `retentionDays` (no age-based deletion) and for the two rate limits
+- `0` **is** meaningful for `retentionDays` (no age-based deletion), for the global rate limit, and for the per-fingerprint `errors.maxRepeatsPerMinute`
   (unlimited).
 - An unrecognised log level is ignored, keeping the previous level. Valid strings are `trace`, `debug`,
   `info`, `warn`, `error`, and the disable synonyms `off`, `none`, `silent` (all normalised to `'off'`).
@@ -85,7 +85,7 @@ A typo must never be able to change behaviour into something worse:
 | `errors.retentionDays` | days | `7` | Age limit; `0` disables it. |
 | `errors.maxRecords` | rows | `500` | Count cap; `0` is rejected. |
 | `errors.maxPayloadBytes` | UTF-8 bytes | `16384` | Per-record budget before the reduction ladder. |
-| `errors.maxEventsPerMinute` | events / 60 s | `120` | Rate limit; `0` disables it. |
+| `errors.maxEventsPerMinute` / `maxRepeatsPerMinute` | events / 60 s, records per fingerprint / 60 s | `120` / `12` | The global cap, and the per-failure cap that runs first. |
 | `errors.captureCsp` | boolean | `false` | Listen for `securitypolicyviolation`. |
 | `errors.captureResources` | boolean | `false` | Capture-phase listener for failed `<script>`/`<link>`/`<img>` loads. |
 | `errors.captureChunkErrors` | boolean | `true` | Treat dynamic-import failures as `source: 'chunk'`. |

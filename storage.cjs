@@ -1352,5 +1352,3 @@ exports.createWebCryptoEncryptionProvider = createWebCryptoEncryptionProvider;
 exports.decryptRecordFields = decryptRecordFields;
 exports.deriveAesKey = deriveAesKey;
 exports.encryptRecordFields = encryptRecordFields;
-//# sourceMappingURL=storage.cjs.map
-//# sourceMappingURL=storage.cjs.map

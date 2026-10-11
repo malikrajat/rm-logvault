@@ -59,6 +59,7 @@ for, so `NEXT_PUBLIC_ERROR_TRACKING_REST_URL` is the Next.js spelling of the sam
 | `VITE_ERROR_TRACKING_MAX_RECORDS` | `errors.maxRecords` | rows | `500` |
 | `VITE_ERROR_TRACKING_MAX_PAYLOAD_BYTES` | `errors.maxPayloadBytes` | UTF-8 bytes per record | `16384` |
 | `VITE_ERROR_TRACKING_MAX_EVENTS_PER_MINUTE` | `errors.maxEventsPerMinute` | events / 60 s; `0` = unlimited | `120` |
+| `VITE_ERROR_TRACKING_MAX_REPEATS_PER_MINUTE` | `errors.maxRepeatsPerMinute` | records per fingerprint / 60 s; `0` = off | `12` |
 
 ### Logs
 

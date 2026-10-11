@@ -1566,5 +1566,3 @@ function backoffFor(attemptNumber, base) {
 }
 
 export { DEFAULT_HTTP_RETRY_DELAY_MS, DEFAULT_HTTP_TIMEOUT_MS, buildHttpErrorContext, categoryForHttpStatus, createAuthHeaderProvider, createAuthInterceptor, createFetchHttpClient, isRetryableStatus, resolveRequestUrl, severityForHttpError };
-//# sourceMappingURL=http.js.map
-//# sourceMappingURL=http.js.map

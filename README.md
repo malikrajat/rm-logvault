@@ -6,16 +6,42 @@
 [![bundle size](https://img.shields.io/bundlephobia/minzip/@codewithrajat/rm-logvault)](https://bundlephobia.com/package/@codewithrajat/rm-logvault)
 [![types](https://img.shields.io/npm/types/@codewithrajat/rm-logvault.svg)](https://www.npmjs.com/package/@codewithrajat/rm-logvault)
 [![license](https://img.shields.io/npm/l/@codewithrajat/rm-logvault.svg)](./LICENSE)
-[![provenance](https://img.shields.io/badge/provenance-signed-brightgreen)](https://docs.npmjs.com/generating-provenance-statements)
 [![CI](https://img.shields.io/github/actions/workflow/status/malikrajat/rm-logvault/ci.yml?branch=main&label=CI)](https://github.com/malikrajat/rm-logvault/actions/workflows/ci.yml)
+[![weekly](https://img.shields.io/npm/dw/@codewithrajat/rm-logvault?label=weekly)](https://www.npmjs.com/package/@codewithrajat/rm-logvault)
+[![total](https://img.shields.io/npm/dt/@codewithrajat/rm-logvault?label=total)](https://www.npmjs.com/package/@codewithrajat/rm-logvault)
+[![last update](https://img.shields.io/npm/last-update/@codewithrajat/rm-logvault)](https://www.npmjs.com/package/@codewithrajat/rm-logvault)
+[![open issues](https://img.shields.io/github/issues/malikrajat/rm-logvault)](https://github.com/malikrajat/rm-logvault/issues)
+[![GitHub stars](https://img.shields.io/github/stars/malikrajat/rm-logvault)](https://github.com/malikrajat/rm-logvault/stargazers)
+[![open pull requests](https://img.shields.io/github/issues-pr/malikrajat/rm-logvault)](https://github.com/malikrajat/rm-logvault/pulls)
+[![contributors](https://img.shields.io/github/contributors/malikrajat/rm-logvault)](https://github.com/malikrajat/rm-logvault/graphs/contributors)
+[![commit activity](https://img.shields.io/github/commit-activity/m/malikrajat/rm-logvault)](https://github.com/malikrajat/rm-logvault/graphs/commit-activity)
+[![last commit](https://img.shields.io/github/last-commit/malikrajat/rm-logvault)](https://github.com/malikrajat/rm-logvault/commits/main)
 ![Stability](https://img.shields.io/badge/Stability-production--ready-success)
 ![Dependencies](https://img.shields.io/badge/Dependencies-zero-success)
 ![Tree-shaking](https://img.shields.io/badge/tree--shaking-supported-success)
 ![Side effects](https://img.shields.io/badge/Side%20Effects-none-blue)
+![Dual build](https://img.shields.io/badge/ESM%20%2B%20CJS-dual%20build-success)
+![Web Worker](https://img.shields.io/badge/Web%20Worker-supported-success)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue)
-![SSR](https://img.shields.io/badge/SSR-compatible-success)
 ![Offline](https://img.shields.io/badge/Offline--first-IndexedDB-blue)
 ![SemVer](https://img.shields.io/badge/SemVer-compliant-blue)
+![Egress](https://img.shields.io/badge/egress-none%20by%20default-success)
+![Never read](https://img.shields.io/badge/cookies%20%2F%20localStorage-never%20read-success)
+![PII](https://img.shields.io/badge/PII-redacted%20before%20storage-success)
+![Browsers](https://img.shields.io/badge/browsers-Chrome%20%7C%20Firefox%20%7C%20Safari%20%7C%20Edge-blue)
+![Commits](https://img.shields.io/badge/commits-conventional-success)
+![Linting](https://img.shields.io/badge/Linting-Biome-success)
+[![Tests](https://img.shields.io/badge/tests-Vitest%20%2B%20fast--check-success)](https://github.com/malikrajat/rm-logvault/actions/workflows/ci.yml)
+[![API](https://img.shields.io/badge/API-documented-success)](docs/API.md)
+[![Examples](https://img.shields.io/badge/Examples-available-blue)](examples/README.md)
+[![Maintained](https://img.shields.io/badge/Maintained-yes-success)](https://github.com/malikrajat/rm-logvault/graphs/commit-activity)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
+![Coverage](https://img.shields.io/badge/Coverage-93%25-success)
+![Accessibility](https://img.shields.io/badge/A11y-WCAG%202.1-blue)
+![Standalone](https://img.shields.io/badge/Standalone-supported-success)
+![SSR safe](https://img.shields.io/badge/SSR-safe-success)
+![Server capture](https://img.shields.io/badge/server--side%20capture-unsupported-red)
+
 
 ## See It In Action
 
@@ -54,6 +80,8 @@
 **Documentation**
 
 - [**Usage Guide**](#using-it-day-to-day) - Logging, capture, storage, export and privacy.
+- [**Worker failures**](examples/vanilla/more-advanced/07-workers-and-dynamic-imports.md) - The capture paths a global handler cannot see, and `withChunkCapture`.
+- [**Duplicates and floods**](examples/vanilla/more-advanced/08-dedupe-throttling-and-testing.md) - The dedupe rule, `toError`, per-failure throttling and the test doubles.
 - [**Configuration**](#configuration) - Every option, default and environment variable.
 - [**Options cheatsheet**](docs/OPTIONS-CHEATSHEET.md) - Every option with its real default inline, and six presets.
 - [**API Reference**](docs/API.md) - Every exported symbol, with signatures and examples.
@@ -151,16 +179,20 @@ RM LogVault is built for developers searching for a browser error tracker, an of
 - **Turns all of it into one file** a user can send you: press `Ctrl+Shift+Alt+D` and a self-contained HTML report downloads.
 - **Deletes secrets before it writes anything.** Tokens, passwords, e-mail addresses and full query strings are replaced with `[REDACTED]` by default, with no setup.
 - **Installs global handlers, and chains yours.** `window.onerror` is captured rather than overwritten, and your handler still runs and still controls whether the default console message is suppressed.
-- **Captures promises, workers, chunk loads and CSP violations.** Unhandled rejections, errors in a Worker or `self` scope, failed dynamic imports and stale-deploy `ChunkLoadError`s are on by default; failed `<script>`/`<link>`/`<img>` loads and `securitypolicyviolation` events are one option away.
+- **Captures promises, chunk loads and CSP violations.** Unhandled rejections, failed dynamic imports and stale-deploy `ChunkLoadError`s are on by default; failed `<script>`/`<link>`/`<img>` loads and `securitypolicyviolation` events are one option away.
+- **Captures worker failures too — but only when you ask.** A `Worker`'s `error` and `messageerror` events fire on the `Worker` object, not on `window`, so nothing can attach for you: one `attachWorker(worker, { name })` call gets you the failures, the deserialisation errors and — opt-in — a worker that is alive but never answers.
+- **Names the screen, not the hash.** `withChunkCapture('Overview', () => import('./Overview'))` files a failed lazy load under the feature the user was reaching for, re-throws the original rejection unchanged, and does not double-count when a boundary also captures it.
 - **Groups repeats instead of flooding you.** One row per distinct error, with an occurrence counter, so 500 hits of the same bug are one record rather than 500.
+- **Enriches a duplicate instead of losing it.** When two paths capture the same `Error`, the second call's `tags`, `extra` and `severity` are merged into the one record and an explicit `source` corrects a defaulted one — `occurrenceCount` still stays at `1`.
 - **Bounds itself automatically.** Retention and row caps expire errors after 7 days and logs after 3, and per-record payload budgets trim oversized records instead of refusing them.
-- **Rate-limits by default**, at 120 errors and 600 logs per minute, and reports a single summary line when it drops the excess rather than one warning per event.
+- **Rate-limits by default**, at 120 errors and 600 logs per minute, and reports a single summary line when it drops the excess rather than one warning per event. A second, per-failure cap of 12 a minute runs first, so one failing poll cannot spend the whole budget and starve every other failure.
+- **`toError` for anything you can throw** — a real `Error` out of a string, a `null`, or a cyclic object, without `String(error)` producing `[object Object]` or `JSON.stringify(error)` throwing first.
 - **Offline-first, never lossy**: records are written to IndexedDB first and uploaded second, so an endpoint that is down, a user on a plane or a mid-deploy server never loses evidence.
 - **Uploads on your terms.** Point `rest.errorsUrl` at your own endpoint and it handles batching, exponential backoff, `Retry-After`, stale-claim recovery and at-least-once delivery keyed on a stable `id`.
 - **Extensible redaction.** Add your own sensitive key names and free-text patterns (`sk_live_…`, tenant headers) on top of the built-ins, and allow-list the query values that are safe to keep.
 - **Callbacks for your own logic.** `beforeCapture` and `beforeStore` let you inspect, change or drop a record; `onTerminalFailure` tells you a batch was rejected for good so you can re-authenticate and requeue it.
 - **Swappable storage and transport.** The repository and the transport are both injectable, so you can store somewhere else, send over your own client, or encrypt records before they land in IndexedDB.
-- **`@codewithrajat/rm-logvault/testing` for your test suite** — an in-memory repository that mirrors real IndexedDB semantics and a fake transport that scripts every upload branch, with no browser and no fake IndexedDB.
+- **`@codewithrajat/rm-logvault/testing` for your test suite** — an in-memory repository that mirrors real IndexedDB semantics, a fake transport that scripts every upload branch, and recording doubles for `captureError` and `logger` so you stop hand-rolling `vi.mock` — all with no browser and no fake IndexedDB.
 - **Zero runtime dependencies and tree-shakeable**: framework packages are optional peers, and importing `captureError` alone costs roughly a quarter of the full recorder.
 - **Framework-agnostic core**: React, Vue, Angular, axios and TanStack Query adapters are thin, optional subpaths, so a Vue app never ships React code.
 - **SSR-safe and microfrontend-safe**: no module-level code touches a browser global, and process-wide state lives on `globalThis` so two bundled copies share one instance instead of double-capturing.
@@ -274,7 +306,7 @@ That is the entire install. Nothing else is pulled in, and no install script run
 ```html
 <!-- index.html — put this near the end of <body> -->
 <script type="module">
-  import { initTelemetry, logger } from 'https://esm.sh/@codewithrajat/rm-logvault@1.0.0';
+  import { initTelemetry, logger } from 'https://esm.sh/@codewithrajat/rm-logvault@1.0.1';
 
   initTelemetry({ appName: 'marketing-site' });
   logger.warn('[Hero] fallback image used');
@@ -302,7 +334,7 @@ Use this when there is no build step at all.
 ```html
 <!-- index.html — the single page you already have -->
 <script type="module">
-  import { initTelemetry } from 'https://esm.sh/@codewithrajat/rm-logvault@1.0.0';
+  import { initTelemetry } from 'https://esm.sh/@codewithrajat/rm-logvault@1.0.1';
 
   initTelemetry({ appName: 'static-site' });
 </script>
@@ -566,6 +598,100 @@ button.addEventListener('click', withErrorCapture(async () => {
 }));
 ```
 
+#### Capturing a worker's failures
+
+A `Worker`'s `error` and `messageerror` events fire on the **`Worker` object**, not on `window`, so
+`initTelemetry` alone never sees them. There is no registry of live workers to scan, so attaching is one
+line where you create the worker:
+
+```ts
+import { attachWorker } from '@codewithrajat/rm-logvault/worker';
+
+const worker = new Worker('/health.worker.js', { type: 'module' });
+const detach = attachWorker(worker, { name: 'healthStatus' });
+
+// …on teardown. Safe to call twice.
+detach();
+```
+
+Every record carries `tags.worker: 'healthStatus'` and a `tags.op` — `'fatal'` for an `error` event,
+`'messageerror'` when the worker sent something that could not be deserialised, and `'timeout'` for a
+worker that is alive but wedged:
+
+```ts
+const attachment = attachWorker(worker, { name: 'search', responseTimeoutMs: 10_000 });
+
+worker.postMessage({ type: 'query', term });
+const settle = attachment.expectResponse('query');
+worker.addEventListener('message', () => settle());
+```
+
+A worker that never answers produces **no event at all**, which is why that timeout is opt-in — it is a
+guess about how long your work should take. `attachWorker` never throws and is inert on something that is
+not a worker, so it is safe to call unconditionally. Full detail:
+[worker and dynamic-import failures](examples/vanilla/more-advanced/07-workers-and-dynamic-imports.md).
+
+#### Chunk loads you catch yourself
+
+`errors.captureChunkErrors` already covers an **uncaught** dynamic-import failure. When you catch the
+rejection — a router loader, `React.lazy`, `defineAsyncComponent`, `next/dynamic` — wrap the import so
+the record says which screen failed instead of naming a hashed chunk:
+
+```ts
+import { withChunkCapture } from '@codewithrajat/rm-logvault';
+
+const load = withChunkCapture('Overview', () => import('./pages/Overview'));
+// source: 'chunk', severity: 'fatal', handled: false, tags.route: 'Overview'
+// The rejection is re-thrown unchanged, and a boundary that also captures it makes ONE record.
+```
+
+```tsx
+// React: the helper goes inside the lazy call.
+const Overview = lazy(withChunkCapture('Overview', () => import('./Overview')));
+```
+
+#### When two paths capture the same error
+
+Deduplication is by **object identity**, and a second `captureError` call for the same `Error` is not a
+second occurrence — `occurrenceCount` stays at `1` and no rate-limit token is spent. Instead, the second
+call **enriches** the record the first one produced:
+
+```ts
+const error = new Error('orders 42 not found');
+
+captureError(error);                                   // source 'manual', no tags
+captureError(error, {                                  // merged into that same record
+  source: 'router',
+  tags: { route: '/orders/:id' },
+});
+```
+
+`tags`, `extra` and `severity` are merged (the later value wins on a shared tag key), and `source`
+replaces the record's source **only if the first capture passed no explicit source** — so a global
+handler's `'manual'` default is correctable, but your deliberate `{ source: 'vue' }` is never overwritten.
+`message`, `stack`, `category`, `page` and `environment` are not patchable. Full detail:
+[duplicates, floods and non-`Error` throws](examples/vanilla/more-advanced/08-dedupe-throttling-and-testing.md).
+
+#### Turning any thrown value into an `Error`
+
+`captureError` accepts anything, so you rarely need this. When you do need a real `Error` — to reject
+with, or to hand to a framework — do not reach for `String(error)` or `JSON.stringify(error)`:
+
+```ts
+import { toError } from '@codewithrajat/rm-logvault';
+
+toError(new TypeError('bad')).message; // 'bad' — the ORIGINAL object, unchanged
+toError('boom').message;               // 'boom'
+toError({ a: 1 }).message;             // 'Non-Error value thrown: {"a":1}'
+
+const cycle: Record<string, unknown> = {};
+cycle['self'] = cycle;
+toError(cycle).cause;                  // the cyclic object, never stringified
+```
+
+It never throws and never calls `JSON.stringify` on raw input; the message comes from the library's own
+normaliser, so it is bounded and already redacted.
+
 #### What it captures automatically
 
 Every recorded error carries a `source` field saying where it came from. This is that list.
@@ -577,7 +703,9 @@ Every recorded error carries a `source` field saying where it came from. This is
 | `chunk`              | Failed dynamic import / `ChunkLoadError` / Vite preload error   | yes                                  |
 | `resource`           | A failed `<script>`, `<link>` or `<img>` load                   | no — `errors.captureResources: true` |
 | `csp`                | A `securitypolicyviolation` event                               | no — `errors.captureCsp: true`       |
-| `worker`             | Errors in a Worker or `self` scope                              | yes (same global handlers)           |
+| `worker`             | A `Worker`'s `error` / `messageerror` events                    | **no** — `attachWorker()` from `@codewithrajat/rm-logvault/worker` |
+| `router`             | Your own route-loader `captureError` calls                      | only if you call it                  |
+| `timeout`            | `attachWorker({ responseTimeoutMs })` + `expectResponse()`      | only if you use it                   |
 | `api`                | `captureApiError`, `captureFetchError`, the axios/fetch adapters | only if you call them                |
 | `event-handler`      | `withErrorCapture`                                              | only if you call it                  |
 | `react`              | The React boundary or root handlers                             | only with `@codewithrajat/rm-logvault/react`           |
@@ -588,9 +716,16 @@ Every recorded error carries a `source` field saying where it came from. This is
 | `storage`            | Reserved for storage-originated failures                        | —                                    |
 | `manual`             | `captureError(err)` with no `source` — the default              | only if you call it                  |
 
-An error recorded from a global source — `window`, `unhandledrejection`, `resource`, `chunk`, `csp`
-or `worker` — is marked `handled: false`, which is how you tell "the user hit this and nothing caught
-it" apart from "the app caught this on purpose".
+> **Source note.** `worker` was previously listed here as captured "by the same global handlers". It is
+> not, and never was: a worker's `error` and `messageerror` events fire on the **`Worker` object**, not
+> on `window`, so nothing `initTelemetry` installs can see them. Attaching is explicit, and only you know
+> where your `Worker` instances are — see [Capturing a worker's failures](#capturing-a-workers-failures).
+
+An error recorded from a global source — `window`, `unhandledrejection`, `resource`, `chunk`, `csp`,
+`worker` or `timeout` — is marked `handled: false`, which is how you tell "the user hit this and nothing
+caught it" apart from "the app caught this on purpose". `router` is deliberately **not** in that set: a
+caller that catches a route-loader rejection has decided how to handle it, so `handled` stays `true`
+unless the caller says otherwise.
 
 logVault never replaces a handler you already installed. A `window.onerror` you wrote is chained: it
 is called, and its return value is returned, so a decision you made about suppressing the default
@@ -903,6 +1038,36 @@ picked up by whichever tab opens next. Nothing is lost.
 open during a deploy" into a single filter in the report. Add `errors.captureResources: true` to also
 catch the resource-load form.
 
+When you catch the rejection yourself — a router's lazy route, a `React.lazy` boundary — wrap the
+import so the record knows **which screen** failed instead of naming a hashed chunk:
+
+```ts
+import { withChunkCapture } from '@codewithrajat/rm-logvault';
+
+const load = withChunkCapture('Overview', () => import('./pages/Overview'));
+// `source: 'chunk'`, `severity: 'fatal'`, `handled: false`, and `tags.route: 'Overview'`.
+// The rejection is re-thrown unchanged, and a boundary that also captures it makes one record, not two.
+```
+
+### How do I capture errors from a Web Worker?
+
+A worker's `error` and `messageerror` events fire on the **`Worker` object**, not on `window`, so
+`initTelemetry` alone never sees them. Attach the worker explicitly:
+
+```ts
+import { attachWorker } from '@codewithrajat/rm-logvault/worker';
+
+const worker = new Worker('/health.worker.js', { type: 'module' });
+const detach = attachWorker(worker, { name: 'healthStatus', responseTimeoutMs: 10_000 });
+```
+
+Every record carries `tags.worker: 'healthStatus'` and `tags.op` (`'fatal'`, `'messageerror'` or
+`'timeout'`). A `messageerror` is a value the worker could not structure-clone — there is no stack for
+it, which is why it gets a synthesised message. `attachWorker` never throws, is inert on something
+that is not a worker, and `detach()` is safe to call twice. Call `expectResponse('query')` before you
+post to catch a worker that is alive but wedged; it reports `tags.op: 'timeout'` when the reply never
+arrives.
+
 ### How do I capture CSP violations?
 
 ```ts
@@ -984,10 +1149,33 @@ with its level and route.
 
 No measurable amount, by design. Capture is synchronous and never waits on the database — persistence
 is queued in the background. Log writes are batched. Records are bounded by depth, key, array and
-length limits, and a rate limiter drops excess (120 errors and 600 logs per minute by default),
-reporting one summary line instead of one warning per dropped event. The expensive work —
-sanitising a deep object, trimming an oversized payload, building a report — happens once per record
-or on demand, never per render.
+length limits, and two rate limiters drop excess: `errors.maxEventsPerMinute` / `logs.maxLogsPerMinute`
+(120 and 600 per minute by default) as a global cap, and `errors.maxRepeatsPerMinute` (12) as a
+per-failure cap that runs first, so one failing poll cannot spend the whole budget and starve every
+other failure. Each reports one summary line instead of one warning per dropped event. The expensive
+work — sanitising a deep object, trimming an oversized payload, building a report — happens once per
+record or on demand, never per render.
+
+### Why is one error repeating so much and then stopping?
+
+That is `errors.maxRepeatsPerMinute`, and it is deliberate. A health-check worker polled every five
+seconds would otherwise produce twelve records a minute for one bug — a tenth of the default error
+budget — and the records that get dropped once the budget runs out are the **new** ones, because the
+poll is always there first. The cap is per failure, it runs before the global limiter, and a repeat it
+refuses costs no global budget at all:
+
+```ts
+import { getTelemetryStatus } from '@codewithrajat/rm-logvault';
+
+const status = getTelemetryStatus();
+status.droppedByRateLimit; // records genuinely missing — the page produced too much
+status.droppedByRepeat;    // already in the report — its budget went to new failures instead
+```
+
+Records that are admitted still aggregate onto the single row for their fingerprint, so twelve allowed
+repeats are one row with `occurrenceCount: 12`. Set `errors.maxRepeatsPerMinute: 0` to disable the
+throttle, or raise it if the repeat count itself is the signal you want — but the real fix is upstream:
+cache the failure, back off, or stop the refetch.
 
 ### Does it work in Safari private mode?
 
@@ -1079,6 +1267,30 @@ destroyTelemetry();
 transport rejection — and `createMemoryRepository({ failWith: 'unavailable' })` or `{ quotaAt: 10 }`
 exercises the degraded-storage and quota-recovery paths.
 
+When the code under test imports the library through your own module (a `shared/telemetry` barrel),
+mock that module with the recording doubles instead of hand-rolling one:
+
+```ts
+import { vi } from 'vitest';
+import { createCaptureErrorMock, createLoggerMock } from '@codewithrajat/rm-logvault/testing';
+
+export const telemetry = createCaptureErrorMock();
+export const logging = createLoggerMock();
+
+vi.mock('shared/telemetry', () => ({
+  captureError: telemetry.captureError,
+  logger: logging.logger,
+}));
+
+// In a test:
+telemetry.messages();            // every captured message, in order
+telemetry.last()?.ctx?.source;   // 'router'
+logging.atLeast('warn');         // calls at warn or above
+```
+
+Both reach no library state — importing `/testing` installs nothing, starts nothing and opens no
+database — and both expose `reset()`, so a module-scoped double cannot leak assertions between files.
+
 ### Do I need a server, a backend or an account?
 
 **No.** This is the question everybody asks, so here is the whole answer. The default `mode: 'local'`
@@ -1144,25 +1356,26 @@ minified and gzipped, by `scripts/measure-size.mjs`:
 | What you import                  | min+gzip   |
 | -------------------------------- | ---------- |
 | types only                       | 0.06 kB    |
-| `logger` only                    | 5.76 kB    |
-| `sanitizeValue` only             | 5.77 kB    |
-| `captureError` only              | 7.10 kB    |
-| `exportDiagnosticsReport` only   | 14.91 kB   |
-| `@codewithrajat/rm-logvault/testing`               | 1.14 kB    |
-| `@codewithrajat/rm-logvault/http`                  | 7.49 kB    |
-| `@codewithrajat/rm-logvault/storage`               | 6.09 kB    |
-| `@codewithrajat/rm-logvault/react`                 | 6.89 kB    |
-| `@codewithrajat/rm-logvault/axios`                 | 7.69 kB    |
-| `@codewithrajat/rm-logvault/fetch`                 | 8.15 kB    |
-| `initTelemetry` (the full recorder) | 31.72 kB |
-| `initTelemetry` + `logger`       | 31.74 kB   |
-| `events` + context builders      | 33.10 kB   |
-| whole barrel, `dist/index.js`    | 36.55 kB   |
+| `logger` only                    | 6.08 kB    |
+| `sanitizeValue` only             | 6.09 kB    |
+| `captureError` only              | 7.43 kB    |
+| `exportDiagnosticsReport` only   | 15.25 kB   |
+| `@codewithrajat/rm-logvault/testing`               | 4.68 kB    |
+| `@codewithrajat/rm-logvault/http`                  | 7.61 kB    |
+| `@codewithrajat/rm-logvault/storage`               | 6.22 kB    |
+| `@codewithrajat/rm-logvault/react`                 | 6.90 kB    |
+| `@codewithrajat/rm-logvault/axios`                 | 7.71 kB    |
+| `@codewithrajat/rm-logvault/fetch`                 | 8.17 kB    |
+| `@codewithrajat/rm-logvault/worker`                | 7.35 kB    |
+| `initTelemetry` (the full recorder) | 33.34 kB |
+| `initTelemetry` + `logger`       | 33.36 kB   |
+| `events` + context builders      | 34.72 kB   |
+| whole barrel, `dist/index.js`    | 37.91 kB   |
 
 Framework adapters are separate subpaths and **no framework is ever bundled** — React, Vue, Angular,
-axios and TanStack Query all stay external, provided by your app. `http` and `storage` are subpaths
-with no peer at all. The regression budget is 37 kB, enforced in CI, so an accidentally-bundled
-dependency fails the build.
+axios and TanStack Query all stay external, provided by your app. `worker`, `http` and `storage` are
+subpaths with no peer at all. The regression budget is 39 kB, enforced in CI, so an
+accidentally-bundled dependency fails the build.
 
 Reproduce the table with `pnpm run size:consumers` (after `pnpm run build`). The whole-barrel figure
 comes from `pnpm run size`, which is the CI gate.
@@ -1264,6 +1477,7 @@ which itself defaults to true when you supply `rest.errorsUrl`, `rest.logsUrl` o
 | `retentionDays`                    | `number \| undefined`                                       | `7`                                            | Delete errors older than this. `0` disables the age cutoff.                                     |
 | `maxPayloadBytes`                  | `number \| undefined`                                       | `16384`                                        | Byte budget per record before logVault progressively trims it.                                  |
 | `maxEventsPerMinute`               | `number \| undefined`                                       | `120`                                          | Rate limit. Excess is dropped and summarised in one line when the window rolls.                 |
+| `maxRepeatsPerMinute`              | `number \| undefined`                                       | `12`                                           | Per-**fingerprint** cap: how many records one failure may produce per 60 s. Checked before `maxEventsPerMinute`, and a refused repeat costs no global budget, so one failing poll cannot starve every other failure. `0` disables it. |
 | `allowedQueryParams`               | `string[] \| undefined`                                     | `[]` (falls back to the redaction default)     | Query parameter names whose **values** survive redaction. Same list as `redaction.allowedQueryParams`. |
 | `preventDefaultUnhandledRejection` | `boolean \| undefined`                                      | `false`                                        | Call `preventDefault()` on `unhandledrejection`. Left `false` so logVault never changes your app's visible behaviour. |
 | `captureResources`                 | `boolean \| undefined`                                      | `false`                                        | Also capture failed `<script>`, `<link>` and `<img>` loads.                                     |
@@ -1348,6 +1562,7 @@ order. The first non-empty match wins.
 | `ERROR_TRACKING_MAX_RECORDS`           | `errors.maxRecords`         | rows                                   | `500`     |
 | `ERROR_TRACKING_MAX_PAYLOAD_BYTES`     | `errors.maxPayloadBytes`    | UTF-8 bytes per record                 | `16384`   |
 | `ERROR_TRACKING_MAX_EVENTS_PER_MINUTE` | `errors.maxEventsPerMinute` | events / 60 s; `0` = unlimited         | `120`     |
+| `ERROR_TRACKING_MAX_REPEATS_PER_MINUTE` | `errors.maxRepeatsPerMinute` | records per fingerprint / 60 s; `0` = off | `12`  |
 | `LOG_PERSIST_ENABLED`                  | `logs.enabled`              | `true`/`false`                         | `true`    |
 | `LOG_LEVEL`                            | `logs.consoleLevel`         | level — console only                   | unchanged |
 | `LOG_PERSIST_LEVEL`                    | `logs.level`                | level; empty inherits `LOG_LEVEL`      | `warn`    |
@@ -1533,6 +1748,7 @@ them in.
 | `@codewithrajat/rm-logvault/angular`     | `@angular/core >= 15`          |
 | `@codewithrajat/rm-logvault/axios`       | `axios >= 1`                   |
 | `@codewithrajat/rm-logvault/fetch`       | nothing                        |
+| `@codewithrajat/rm-logvault/worker`      | nothing                        |
 | `@codewithrajat/rm-logvault/react-query` | `@tanstack/react-query >= 4`   |
 | `@codewithrajat/rm-logvault/http`        | nothing                        |
 | `@codewithrajat/rm-logvault/storage`     | nothing                        |
@@ -1568,7 +1784,10 @@ declarations for every subpath. No `@types` package needed.
 | Records are stuck in `failed`                 | A terminal status (`400`, `401`, `403`, `404`, `405`, `410`, `413`, `415`, `422`) marked the whole batch              | Inspect `onTerminalFailure`'s arguments, fix the cause, then call `retryFailedTelemetry()`                                      |
 | The same error appears twice                  | At-least-once delivery after a lost 2xx, or two separate copies of the library in different module realms             | Key your server on the record `id`; check for a duplicate bundled copy                                                          |
 | Errors thrown before `initTelemetry` are missing | The 50-entry pre-init buffer overflowed, or `enabled: false` suppressed them                                        | Call `initTelemetry` as early as you can; the buffer keeps the oldest 50 and drops the newest overflow                          |
-| The bundle is over 37 kB                      | An adapter was imported into the main entry, or the whole package was imported for one helper                        | Import `@codewithrajat/rm-logvault/react` and friends as subpaths; run `pnpm run size`                                                             |
+| The bundle is over 39 kB                      | An adapter was imported into the main entry, or the whole package was imported for one helper                        | Import `@codewithrajat/rm-logvault/react` and friends as subpaths; run `pnpm run size`                                                             |
+| Errors from a Web Worker never appear         | A worker's `error`/`messageerror` events fire on the `Worker` object, not on `window`, so nothing is installed by default | `attachWorker(worker, { name })` from `@codewithrajat/rm-logvault/worker`                                                       |
+| An error is missing its tags or its `source`  | The same `Error` reached two paths, and the record was created by the first one                                        | Both calls now merge; the second call's `tags`/`extra` are applied, and its `source` wins only if the first had none            |
+| Errors are dropped while `droppedByRepeat` climbs | One failure is repeating past `errors.maxRepeatsPerMinute` (default 12/min), which is deliberate                     | It is already in the report; raise or disable the cap only if the repeat count itself is the signal you want                     |
 | A record contains `[REDACTED]` where you wanted data | A key name matched the sensitive-key pattern, or a query-string value is not allow-listed                            | Rename the field so it no longer looks sensitive, or add the parameter name to `redaction.allowedQueryParams`                   |
 
 Fuller symptom-by-symptom entries live in [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
@@ -1681,6 +1900,14 @@ Saying this plainly is more useful than a long feature list.
   report drills down from a page load to an error to the logs around it, but there is no hosted
   interface for triaging them. The file is the interface.
 - **No at-rest encryption.** Records in IndexedDB are redacted, not encrypted.
+- **`logger.*` does not capture errors.** `logger.error('[Checkout] failed', error)` writes a **log**
+  record and nothing else — it never appeared in the errors store, whatever it was passed, and strings
+  and numbers included. Call `captureError(error, ctx)` explicitly. `captureError` accepts any type and
+  normalises internally, so `String(error)` and `JSON.stringify(error)` are never needed; use `toError`
+  when you genuinely need an `Error` object back.
+- **No automatic worker instrumentation.** `attachWorker` is explicit. There is no registry of live
+  `Worker` instances to scan, and keeping one would mean wrapping the `Worker` constructor — changing
+  what your own `instanceof Worker` checks return, on every page.
 
 If you need replay, symbolication or alert rules, a hosted platform is the right tool. logVault is
 for keeping the evidence on the device, under your own control, at zero cost and zero dependencies.

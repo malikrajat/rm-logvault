@@ -95,7 +95,8 @@ coercion in an error-reporting library means you discover the mistake during an 
 
 Which options accept `0` is not uniform, and it is documented per option rather than left to
 inference — the rule is "does `0` have a meaning here?". It does for `retentionDays`,
-`maxEventsPerMinute` and `maxLogsPerMinute`; it does not for `maxRecords` or `maxPayloadBytes`.
+`maxEventsPerMinute`, `maxRepeatsPerMinute` and `maxLogsPerMinute`; it does not for `maxRecords` or
+`maxPayloadBytes`.
 
 ## Where to look for the rest
 

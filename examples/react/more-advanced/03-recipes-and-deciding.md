@@ -56,6 +56,8 @@ createRoot(document.getElementById('root') as HTMLElement, {
 | Something threw and the automatic record lacks context | `withErrorCapture` (keep the throw) or `useErrorCapture` (stop it) | The automatic record cannot know your order id. |
 | You caught a failure and the user is fine | `captureError(error, ctx)` | It reports and returns instead of throwing. |
 | You want to report a wrong-but-not-fatal state | `captureError(error, ctx)` | Nothing was thrown to capture. |
+| A `Worker` throws, or never answers | `attachWorker(worker, { name })` from `@codewithrajat/rm-logvault/worker`, inside an effect with a cleanup | No React hook sees it — the events fire on the `Worker` object, not on `window`. |
+| A ``React.lazy`` load fails | `withChunkCapture(route, loader)` wrapped around the import | A boundary that catches it cannot name the screen. |
 
 The first two rows are additive: you want **both** the boundary and the root handlers, because they
 cover different failures — a boundary only helps where you placed it, and the root handlers are the only

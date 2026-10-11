@@ -250,6 +250,10 @@ the default genuinely does not fit.
   provider only routes Angular's `ErrorHandler` into the pipeline.
 - **Reconfiguring means `destroyTelemetry()` first**, because `initTelemetry` is idempotent and a second
   call returns the existing handle.
+- **A `Worker` belongs in an injectable service**, and must not be constructed during a server render or a
+  prerender pass — [07-workers-and-dynamic-imports.md](./07-workers-and-dynamic-imports.md).
+- **`TelemetryErrorHandler` and your own `catchError` no longer race** for the same record; the second
+  capture enriches the first — [08-dedupe-throttling-and-testing.md](./08-dedupe-throttling-and-testing.md).
 
 ## Next
 
@@ -259,6 +263,10 @@ the default genuinely does not fit.
   provider feeding both it and the telemetry upload.
 - [Encrypting stored records](./06-encrypting-stored-records.md) — AES-GCM at rest, and which fields are
   worth encrypting.
+- [Workers and dynamic imports](./07-workers-and-dynamic-imports.md) — `attachWorker` in a service,
+  `withChunkCapture` in a lazy route, and the silence timeout.
+- [Duplicates, floods and testing](./08-dedupe-throttling-and-testing.md) — the dedupe rule,
+  `errors.maxRepeatsPerMinute`, `toError`, and the test doubles.
 - [The recipes and choosing between them](./03-recipes-and-deciding.md) — the decision table across
   Angular's error paths, and how to assert each one in a test.
 - The Angular adapter in depth: [01-framework-adapter.md](./01-framework-adapter.md).

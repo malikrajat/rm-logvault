@@ -81,6 +81,8 @@ Standalone is the default in Angular 19+, so no component here declares `standal
 | You caught a failure and the user is fine | `captureError(error, { handled: true })` | Nothing was thrown to capture, and a re-throw would only add noise. |
 | Something threw and the automatic record lacks context | `withErrorCapture` — keep the throw | The automatic record cannot know your order id. |
 | Per-error context derived from the error, or a handler that injects a service | Your own `ErrorHandler` | The provider merges one fixed `context`; it cannot inspect the error. |
+| A `Worker` throws, or never answers | `attachWorker(worker, { name })` from `@codewithrajat/rm-logvault/worker`, in an injectable service | Angular's `ErrorHandler` never sees it — worker events fire on the `Worker` object. |
+| A lazy route fails to load, and you catch it | `withChunkCapture(route, loader)` inside `loadComponent` | The route's own error path cannot name the screen. |
 
 The first three rows are all "write nothing", and together they are the majority of your coverage. The
 last row is the one escape hatch, and

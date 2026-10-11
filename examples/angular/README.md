@@ -25,7 +25,7 @@ work without `emitDecoratorMetadata` — see [more-advanced](./more-advanced/REA
 | [basic](./basic/README.md) | the integration, and the bootstrap failure no `ErrorHandler` can cover | [capture recipes](./basic/01-capture-recipes.md) — the four ways an error gets recorded |
 | [advanced](./advanced/README.md) | uploads and retention | [what arrives at your collector](./advanced/02-what-arrives-at-the-collector.md) |
 | [config](./config/README.md) | the options that matter, and `fileReplacements` | [environment variables](./config/01-environment-variables.md), [levels and thresholds](./config/03-levels-and-thresholds.md) |
-| [more-advanced](./more-advanced/README.md) | the adapter and the replaceable seams | [the Angular adapter](./more-advanced/01-framework-adapter.md), [the recipes and choosing between them](./more-advanced/03-recipes-and-deciding.md) |
+| [more-advanced](./more-advanced/README.md) | the adapter and the replaceable seams | [the Angular adapter](./more-advanced/01-framework-adapter.md), [workers and dynamic imports](./more-advanced/07-workers-and-dynamic-imports.md), [duplicates, floods and testing](./more-advanced/08-dedupe-throttling-and-testing.md), [the recipes and choosing between them](./more-advanced/03-recipes-and-deciding.md) |
 
 ## Pages added for the observation and extension surface
 

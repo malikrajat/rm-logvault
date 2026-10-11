@@ -127,6 +127,7 @@ are silent by design, and both are reported through `onInternalError`.
 | Limit | Option | Default | Unit |
 | --- | --- | --- | --- |
 | Error rate | `errors.maxEventsPerMinute` | `120` | errors per 60 s window |
+| Repeat rate | `errors.maxRepeatsPerMinute` | `12` | records one fingerprint may produce per 60 s window |
 | Log rate | `logs.maxLogsPerMinute` | `600` | logs per 60 s window |
 | Error record size | `errors.maxPayloadBytes` | `16384` | UTF-8 bytes per record |
 | Log record size | `logs.maxPayloadBytes` | `4096` | UTF-8 bytes per record |

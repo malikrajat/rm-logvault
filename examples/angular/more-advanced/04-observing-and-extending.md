@@ -240,7 +240,7 @@ The six events and their payloads:
 | `sync:started` | an explicit `syncTelemetry()` begins, per kind | `kind`, `recordCount` |
 | `sync:completed` | a kind's upload pass finishes | `kind`, `uploaded`, `retried`, `failed` |
 | `sync:failed` | a kind had terminally-failed records | `kind`, `status`, `recordCount` |
-| `record:dropped` | the rate limiter discarded captures | `kind`, `reason`, `count` |
+| `record:dropped` | the rate limiter or the repeat throttle discarded captures | `kind`, `reason` (`'rate-limit'` \| `'repeat-limit'` \| `'consent'` \| `'payload-limit'` \| `'before-hook'`), `count` |
 
 > **Source note.** **`on()` is a no-op before `initTelemetry` runs.** It returns an unsubscribe function
 > and registers nothing, so a listener subscribed too early is silently never called. That is why the

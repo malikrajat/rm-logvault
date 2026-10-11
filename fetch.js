@@ -1651,5 +1651,3 @@ function instrumentFetch(options = {}) {
 }
 
 export { instrumentFetch, registerTelemetryUrl };
-//# sourceMappingURL=fetch.js.map
-//# sourceMappingURL=fetch.js.map

@@ -42,7 +42,7 @@ only *where* the two files live changes, which that framework's `basic` guide co
 | **`basic`**         | "Something is throwing in production and I have no idea what."                 | One `initTelemetry()` call, where it belongs in *your* framework, and how to read the status back.    |
 | **`advanced`**      | "I want these on my own server, and I do not want the store to grow forever."  | `mode: 'remote'`, separate endpoints for errors and logs, retention and caps, and the export API.     |
 | **`config`**        | "Which number do I actually change, and to what?"                             | The options that matter, their units and defaults, the environment variables, and the precedence rule. |
-| **`more-advanced`** | "I need to control where records go, or how they are shaped."                  | A custom repository or transport, record hooks, internal-failure reporting, each framework's adapter, the observation surface (events, context builders, named sinks), the HTTP client, and encryption at rest. |
+| **`more-advanced`** | "I need to control where records go, or how they are shaped."                  | A custom repository or transport, record hooks, internal-failure reporting, each framework's adapter, the observation surface (events, context builders, named sinks), the HTTP client, encryption at rest, worker capture, and what happens when two paths capture the same error. |
 
 ## The recipe pages, in every framework
 
@@ -65,7 +65,7 @@ reading whichever framework you use, because none of it is framework-specific.
 
 ## The new-feature pages, in every framework
 
-Three additions ship on their own subpaths or in the core, and each has a page in **every** framework so
+Five additions ship on their own subpaths or in the core, and each has a page in **every** framework so
 you can see where the code belongs in yours rather than translating a vanilla snippet:
 
 | Page | Vanilla | React | Vue 3 | Angular | Next.js |
@@ -73,11 +73,14 @@ you can see where the code belongs in yours rather than translating a vanilla sn
 | Observing and extending — events, context builders, sink registry, flat aliases | [page](vanilla/more-advanced/04-events-and-context-builders.md) | [page](react/more-advanced/04-observing-and-extending.md) | [page](vue/more-advanced/04-observing-and-extending.md) | [page](angular/more-advanced/04-observing-and-extending.md) | [page](nextjs/more-advanced/04-observing-and-extending.md) |
 | Calling an API — `@codewithrajat/rm-logvault/http` | [page](vanilla/more-advanced/05-using-the-http-client.md) | [page](react/more-advanced/05-using-the-http-client.md) | [page](vue/more-advanced/05-using-the-http-client.md) | [page](angular/more-advanced/05-using-the-http-client.md) | [page](nextjs/more-advanced/05-using-the-http-client.md) |
 | Encrypting stored records — `@codewithrajat/rm-logvault/storage` | [page](vanilla/more-advanced/06-encrypting-stored-records.md) | [page](react/more-advanced/06-encrypting-stored-records.md) | [page](vue/more-advanced/06-encrypting-stored-records.md) | [page](angular/more-advanced/06-encrypting-stored-records.md) | [page](nextjs/more-advanced/06-encrypting-stored-records.md) |
+| Worker failures and dynamic imports — `@codewithrajat/rm-logvault/worker` and `withChunkCapture` | [page](vanilla/more-advanced/07-workers-and-dynamic-imports.md) | [page](react/more-advanced/07-workers-and-dynamic-imports.md) | [page](vue/more-advanced/07-workers-and-dynamic-imports.md) | [page](angular/more-advanced/07-workers-and-dynamic-imports.md) | [page](nextjs/more-advanced/07-workers-and-dynamic-imports.md) |
+| Duplicates, floods and testing — the dedupe rule, `errors.maxRepeatsPerMinute`, `toError`, `@codewithrajat/rm-logvault/testing` | [page](vanilla/more-advanced/08-dedupe-throttling-and-testing.md) | [page](react/more-advanced/08-dedupe-throttling-and-testing.md) | [page](vue/more-advanced/08-dedupe-throttling-and-testing.md) | [page](angular/more-advanced/08-dedupe-throttling-and-testing.md) | [page](nextjs/more-advanced/08-dedupe-throttling-and-testing.md) |
 
 The vanilla pages carry the depth, because none of the behaviour is framework-specific; the other four
 show **where the code goes** — a composable, a service, a client module, an initialiser — and which
-framework rules apply. Where an addition is client-only (storage encryption needs IndexedDB and
-`crypto.subtle`), the Next.js page also covers the server boundary.
+framework rules apply. Where an addition is client-only, the Next.js page also covers the server
+boundary: storage encryption needs IndexedDB and `crypto.subtle`, and a `Worker` does not exist on the
+server at all.
 
 ## Which should I start with?
 
@@ -93,6 +96,11 @@ framework rules apply. Where an addition is client-only (storage encryption need
   above. `handle.events` and `registerErrorContextBuilder` are the two seams most people want first.
 - **If your own API calls should become records:** the HTTP client page. It is a separate import, so it
   costs nothing until you use it.
+- **If you own a `Worker`, or you catch your own dynamic-import rejections:** the worker page. Both of
+  those failures are invisible to the global handlers, and only your call site knows where they came
+  from.
+- **If one error is filling your report, or two paths capture the same one:** the duplicates page. It
+  also carries the test doubles, so it is worth a look before you hand-roll another `vi.mock`.
 
 ## Three things worth knowing before you copy anything
 

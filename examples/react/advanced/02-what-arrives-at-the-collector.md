@@ -81,7 +81,7 @@ This is the record shape your three recipes produce. The interesting columns are
   "source": "event-handler",
   "severity": "error",
   "category": "runtime",
-  "handled": false,
+  "handled": true,
   "thrownType": "error",
   "uploadStatus": "pending",
   "uploadAttempts": 0,
@@ -121,11 +121,21 @@ Two of these are worth a second look:
   they go back to `pending`, or to `failed` if the failure was terminal, which is what
   [`onTerminalFailure`](./01-export-and-manual-sync.md) exists to handle.
 
-> **Source note.** `severity` defaults to `'error'`, and `handled` to `false`. `reactRootErrorHandlers`
-> is the one path that overrides both: `onUncaughtError` sets `severity: 'fatal'`, while
-> `onCaughtError` and `onRecoverableError` set `handled: true` and a recoverable one is downgraded to
-> `severity: 'warning'` with `tags: { recoverable: 'true' }`. So the same failure can be filed
-> differently depending on which React path reported it, and that is deliberate.
+> **Source note.** `severity` defaults to `'error'` for anything that is not a recognised chunk failure,
+> and `handled` is **derived from the `source`**, not fixed: `handled = !UNHANDLED_SOURCES.has(source)`.
+> `UNHANDLED_SOURCES` is `window`, `unhandledrejection`, `resource`, `chunk`, `csp`, `worker` and
+> `timeout` — so a bare `throw` captured by the global handler is `handled: false`, while a `source` the
+> application chose (`manual`, `event-handler`, `router`, `api`, `react`, …) is `handled: true`.
+>
+> `reactRootErrorHandlers` overrides `severity` on two of its three paths — `onUncaughtError` sets
+> `'fatal'`, `onRecoverableError` sets `'warning'` — and sets `handled: true` explicitly on
+> `onCaughtError` and `onRecoverableError`. `onUncaughtError` sets no `handled` at all, so it derives
+> `true` from `source: 'react'`: a React root that reports a render failure *did* see it, which is not
+> the same thing as `window.onerror` catching one nobody did. Pass `handled: false` in `context` if your
+> own triage needs to draw that line.
+>
+> The same failure can therefore be filed differently depending on which React path reported it, and that
+> is deliberate.
 
 ## Watching the request leave, from a component
 

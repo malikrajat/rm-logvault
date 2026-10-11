@@ -262,6 +262,13 @@ window.addEventListener('online', () => {
 - **`onDecryptFailure` is a diagnosis hook, not a data-loss handler.** A field that cannot be decrypted
   keeps its stored value, so nothing is lost — you just have to notice the warning. See
   [06-encrypting-stored-records.md](./06-encrypting-stored-records.md#when-a-field-cannot-be-decrypted).
+- **A `Worker` needs a composable, not a component.** `attachWorker` has to run once and be detached once,
+  which is `onScopeDispose` inside a composable rather than `onUnmounted` inside whichever component
+  happened to create the worker. See
+  [07-workers-and-dynamic-imports.md](./07-workers-and-dynamic-imports.md).
+- **Two paths capturing one error is now harmless.** `attachVueTelemetry`'s chained `errorHandler` and
+  your own `catch` used to race for the record; the second call now enriches it. See
+  [08-dedupe-throttling-and-testing.md](./08-dedupe-throttling-and-testing.md).
 
 ## Next
 
@@ -273,6 +280,12 @@ window.addEventListener('online', () => {
   attempt, an interceptor, and one auth provider feeding both the client and the recorder.
 - **Encrypt what is stored:** [06-encrypting-stored-records.md](./06-encrypting-stored-records.md) —
   Base64 versus AES-GCM, wrapping both repositories, and which fields to leave alone.
+- **Capture what a global handler cannot see:**
+  [07-workers-and-dynamic-imports.md](./07-workers-and-dynamic-imports.md) — `attachWorker` in a
+  composable, `withChunkCapture` in `defineAsyncComponent`, and the silence timeout.
+- **Understand duplicates and floods:**
+  [08-dedupe-throttling-and-testing.md](./08-dedupe-throttling-and-testing.md) — what a repeat capture
+  does, `errors.maxRepeatsPerMinute`, `toError`, and the test doubles.
 - [The recipes and choosing between them](./03-recipes-and-deciding.md) — the decision table across
   Vue's error paths, the chaining guarantee, and how to assert each one in a test.
 - The Vue adapter in depth: [01-framework-adapter.md](./01-framework-adapter.md).

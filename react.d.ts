@@ -1,5 +1,5 @@
 import { Component, ReactNode, ErrorInfo } from 'react';
-import { E as ErrorContext } from './types-vgch86Bo.js';
+import { E as ErrorContext } from './types--hrpBzU7.js';
 
 /**
  * React adapter: an error boundary, React 19 root error handlers and a hook.

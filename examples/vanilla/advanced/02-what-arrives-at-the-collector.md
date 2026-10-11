@@ -89,7 +89,7 @@ This is the record shape your recipes produce. The interesting columns are the l
   "source": "event-handler",
   "severity": "error",
   "category": "runtime",
-  "handled": false,
+  "handled": true,
   "thrownType": "error",
   "uploadStatus": "pending",
   "uploadAttempts": 0,
@@ -134,7 +134,10 @@ Two of these are worth a second look:
   they go back to `pending`, or to `failed` if the failure was terminal. A `401` is terminal, and
   `rest.onTerminalFailure(status, records)` fires **once per batch**, not once per record.
 
-> **Source note.** `severity` defaults to `'error'`, `handled` to `false` and `category` to `'runtime'`.
+> **Source note.** `severity` defaults to `'error'` and `category` to `'runtime'`; `handled` is **derived
+> from the `source`** as `!UNHANDLED_SOURCES.has(source)`, so `'window'`, `'unhandledrejection'`,
+> `'resource'`, `'chunk'`, `'csp'`, `'worker'` and `'timeout'` are `false` and every source you chose
+> yourself (`'manual'`, `'event-handler'`, `'router'`, `'api'`, …) is `true`.
 > Nothing in the vanilla tier overrides them for you — there is no framework adapter path here. The only
 > way to change them is a field on the `ErrorContext` you pass to `captureError` or `withErrorCapture`,
 > which accepts `source`, `severity`, `category`, `componentStack`, `location`, `api`, `event`, `tags`,

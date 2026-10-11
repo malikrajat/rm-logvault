@@ -1344,5 +1344,3 @@ async function createAesGcmEncryptionProvider(options) {
 }
 
 export { createAesGcmEncryptionProvider, createBase64EncryptionProvider, createEncryptingRepository, createWebCryptoEncryptionProvider, decryptRecordFields, deriveAesKey, encryptRecordFields };
-//# sourceMappingURL=storage.js.map
-//# sourceMappingURL=storage.js.map

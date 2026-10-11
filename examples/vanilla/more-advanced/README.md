@@ -61,9 +61,20 @@ Neither observation nor replacement — these are additions you reach for on the
 | --- | --- | --- |
 | `@codewithrajat/rm-logvault/http` | Turning your own API failures into records, with status, method, URL and retry classification done once. | [using the HTTP client](./05-using-the-http-client.md) |
 | `@codewithrajat/rm-logvault/storage` | Encrypting chosen record fields at rest, for when a database dump is the threat. | [encrypting stored records](./06-encrypting-stored-records.md) |
+| `@codewithrajat/rm-logvault/worker` | A worker's failures, which fire on the `Worker` object rather than `window` and so are invisible to every global handler. | [workers and dynamic imports](./07-workers-and-dynamic-imports.md) |
 | `exportDiagnosticsReport({ format })` | `jsonl` and `csv` alongside `html` and `json`, so a report can go into a pipeline or a spreadsheet. | [the report](../../README.md), [API reference](../../../docs/API.md) |
 
 Both subpaths are separate imports, so an application that uses neither pays nothing for them.
+
+## The two failure paths that need a call site
+
+Two of the seams above are not seams at all — they are the two places where the library **cannot** help
+without you, because the only code that knows about the failure is yours:
+
+| Page | The failure | Why the library cannot see it |
+| --- | --- | --- |
+| [workers and dynamic imports](./07-workers-and-dynamic-imports.md) | A `Worker` throws, or sends something that cannot be deserialised, or never answers. | `error` and `messageerror` fire on the `Worker` object. There is no registry of live workers to scan. |
+| [duplicates, floods and non-`Error` throws](./08-dedupe-throttling-and-testing.md) | The same error is captured by two paths, one failure fills the error budget, or a value that is not an `Error` needs to become one. | The pipeline can only enrich a record whose second caller tells it something new, and only you can decide what to do about a poll that fails forever. |
 
 ## What each seam costs you
 
@@ -82,6 +93,10 @@ Both subpaths are separate imports, so an application that uses neither pays not
   surface, the merge rule, and the flat configuration aliases.
 - [using the HTTP client](./05-using-the-http-client.md) — capturing your own API failures.
 - [encrypting stored records](./06-encrypting-stored-records.md) — encryption at rest, and its limits.
+- [workers and dynamic imports](./07-workers-and-dynamic-imports.md) — the two capture paths a global
+  handler cannot reach.
+- [duplicates, floods and non-`Error` throws](./08-dedupe-throttling-and-testing.md) — the dedupe rule,
+  the per-fingerprint throttle, `toError`, and the test doubles.
 - [config](../config/README.md) — the options surface these hooks sit alongside.
 - [docs/ARCHITECTURE.md](../../../docs/ARCHITECTURE.md) — how the pieces fit, including the outbox.
 - [docs/DECISIONS.md](../../../docs/DECISIONS.md) — why the defaults are what they are.

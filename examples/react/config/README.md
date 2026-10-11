@@ -56,6 +56,7 @@ tree: [../../vanilla/config/01-options-at-a-glance.md](../../vanilla/config/01-o
 | `rest.batchSize` | records per request | `50` | Request size, and the blast radius of a terminal failure. |
 | `rest.intervalMs` | milliseconds | `30000` | Floor between flushes after a success. |
 | `errors.retentionDays` / `maxRecords` / `maxPayloadBytes` | days / rows / UTF-8 bytes | `7` / `500` / `16384` | How much error history survives. |
+| `errors.maxEventsPerMinute` / `maxRepeatsPerMinute` | events / 60 s, records per fingerprint / 60 s | `120` / `12` | The global cap, and the per-failure cap that runs first so one polling bug cannot spend the whole budget. |
 | `logs.enabled` / `level` | boolean / level | `true` / `'warn'` | Whether logs are persisted, and from which level. |
 | `logs.consoleLevel` | level | **none** | Console verbosity applied at init. No default, so it never changes console output unless asked. |
 | `shortcut` | `false \| ShortcutOptions` | enabled | `false` removes the keyboard shortcut — see the React alternative in [advanced](../advanced/01-export-and-manual-sync.md). |

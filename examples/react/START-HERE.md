@@ -557,6 +557,11 @@ initTelemetry({
 | Encryption | `@codewithrajat/rm-logvault/storage` | A database dump is a threat you must answer | C |
 | Export formats | core | JSONL, CSV, or a clipboard button | D |
 | Sink registry | core, via `getSinkRegistry()` | Three or more sinks, and you need to list them | [observing and extending](./more-advanced/04-observing-and-extending.md) |
+| Worker capture | `@codewithrajat/rm-logvault/worker` | You own a `Worker`, and its failures are invisible to the global handlers | [worker failures](./more-advanced/07-workers-and-dynamic-imports.md) |
+| `withChunkCapture` | core | You catch a `React.lazy` / route-loader rejection yourself | [worker failures](./more-advanced/07-workers-and-dynamic-imports.md) |
+| `toError` | core | You need a real `Error` from a value of unknown shape | [duplicates and floods](./more-advanced/08-dedupe-throttling-and-testing.md) |
+| `errors.maxRepeatsPerMinute` | core option | One polling failure is spending the whole error budget | [duplicates and floods](./more-advanced/08-dedupe-throttling-and-testing.md) |
+| `createCaptureErrorMock`, `createLoggerMock` | `@codewithrajat/rm-logvault/testing` | Your tests mock `captureError` or `logger` by hand | [duplicates and floods](./more-advanced/08-dedupe-throttling-and-testing.md) |
 
 ## Related
 
@@ -567,5 +572,9 @@ initTelemetry({
 - [the HTTP client](./more-advanced/05-using-the-http-client.md) — when your own API calls should be
   records too.
 - [encrypting stored records](./more-advanced/06-encrypting-stored-records.md) — the full encryption page.
+- [worker failures and dynamic imports](./more-advanced/07-workers-and-dynamic-imports.md) — the two
+  capture paths `initTelemetry` cannot see.
+- [duplicates, floods and testing](./more-advanced/08-dedupe-throttling-and-testing.md) — what a repeat
+  capture does, and the doubles for your own tests.
 - [config](./config/README.md) — every option, its unit and its default.
 - [capture recipes](./basic/01-capture-recipes.md) — the four ways an error gets recorded.

@@ -197,7 +197,7 @@ export function startTelemetryBridge(): () => void {
 | `sync:started` | `syncTelemetry()` begins, per kind. | `kind`, `recordCount` |
 | `sync:completed` | A kind's upload pass finishes. | `kind`, `uploaded`, `retried`, `failed` |
 | `sync:failed` | A kind had terminally-failed records. | `kind`, `status`, `recordCount` |
-| `record:dropped` | The rate limiter discarded captures. | `kind`, `reason`, `count` |
+| `record:dropped` | The rate limiter or the per-fingerprint repeat throttle discarded captures. | `kind`, `reason`, `count` |
 
 Every payload also carries `timestamp` (milliseconds since the epoch).
 
@@ -207,8 +207,11 @@ Every payload also carries `timestamp` (milliseconds since the epoch).
 > `recordCount` for the size, and `rest.onTerminalFailure(status, records)` when you need the real
 > status.
 >
-> `record:dropped.reason` is `'rate-limit'` today. The type also allows other reasons, but only the
-> rate limiter emits this event.
+> `record:dropped.reason` is `'rate-limit'` or `'repeat-limit'` — a capture refused by
+> `errors.maxEventsPerMinute`, and a repeat refused by `errors.maxRepeatsPerMinute`. They are separate
+> events because they mean opposite things: the first is a gap, the second is a failure that is already
+> in the report. `'consent'`, `'payload-limit'` and `'before-hook'` are in the type but no shipped path
+> emits them.
 
 > **Source note.** `on()` while telemetry is **not** initialized is a no-op: it returns an unsubscribe
 > function, but the listener is never registered and is never called. `handle.events` is a stable object

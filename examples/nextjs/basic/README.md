@@ -133,7 +133,8 @@ Everything else is defaulted, and the defaults are the interesting part:
 | `mode` | `'local'` | Records go to IndexedDB and **nothing is uploaded**, so the library is safe to add before a collector exists. Supplying a `rest.errorsUrl` or `rest.logsUrl` implies `'remote'` — see [advanced](../advanced/README.md). |
 | `enabled` | `true` | The master switch. `false` makes every capture call a no-op and installs nothing. |
 | `errors.enabled` / `logs.enabled` | `true` / `true` | Both stores are on. You can keep one and drop the other. |
-| `errors.retentionDays` / `maxRecords` | `7` days / `500` rows | Whichever limit is reached first deletes a row. |
+| `errors.retentionDays` / `maxRecords` | `7` days / `500` rows |
+| `errors.maxRepeatsPerMinute` | `12` records per fingerprint per 60 s — a repeat past the cap costs no global budget | Whichever limit is reached first deletes a row. |
 | `logs.retentionDays` / `maxRecords` | `3` days / `2000` rows | Logs are more voluminous and less precious than errors. |
 | `logs.level` | `'warn'` | The **persist** threshold. `logger.info(...)` is dropped here **and** by the console threshold, which also defaults to `'warn'` — so at this tier an `info` line is neither printed nor stored. Raise `logs.consoleLevel` to see it, `logs.level` to keep it. |
 | `shortcut` | enabled, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>D</kbd> | Downloads a self-contained HTML diagnostics report with no code at all. |
@@ -154,6 +155,7 @@ current.pending.errors;     // records written but not yet uploaded
 current.pending.logs;
 current.online;
 current.droppedByRateLimit;
+current.droppedByRepeat;    // one failure repeating past its own cap
 ```
 
 Call it from a client component and render the result — it reports in-memory state and does **not** read

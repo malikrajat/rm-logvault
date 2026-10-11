@@ -1577,5 +1577,3 @@ exports.createFetchHttpClient = createFetchHttpClient;
 exports.isRetryableStatus = isRetryableStatus;
 exports.resolveRequestUrl = resolveRequestUrl;
 exports.severityForHttpError = severityForHttpError;
-//# sourceMappingURL=http.cjs.map
-//# sourceMappingURL=http.cjs.map

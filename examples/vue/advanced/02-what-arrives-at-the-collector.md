@@ -86,7 +86,7 @@ This is the record shape the recipes produce. The interesting columns are the la
   "source": "event-handler",
   "severity": "error",
   "category": "runtime",
-  "handled": false,
+  "handled": true,
   "thrownType": "error",
   "uploadStatus": "pending",
   "uploadAttempts": 0,
@@ -129,9 +129,11 @@ Two of these are worth a second look:
   `rest.onTerminalFailure(status, records)` fires once per batch, and those records are not retried
   forever.
 
-> **Source note.** `severity` defaults to `'error'`, `handled` to `false` and `category` to `'runtime'`.
-> The Vue adapter's `warnHandler` path is the one that overrides the first two: a Vue warning is filed
-> with `severity: 'warning'` and `handled: true`. So the same failure can be filed differently depending
+> **Source note.** `severity` defaults to `'error'` and `category` to `'runtime'`; `handled` is **derived
+> from the `source`** as `!UNHANDLED_SOURCES.has(source)`, which makes it `false` for the global sources
+> (`'window'`, `'unhandledrejection'`, `'resource'`, `'chunk'`, `'csp'`, `'worker'`, `'timeout'`) and
+> `true` for anything a boundary or a call site chose — including `'vue'`. The Vue adapter's `warnHandler`
+> path is the one that overrides `severity` as well: a Vue warning is filed with `severity: 'warning'`. So the same failure can be filed differently depending
 > on which Vue hook reported it, and that is deliberate.
 
 > **Source note.** The plugin's `context` reaches **only** the two hooks the adapter installs. It is not

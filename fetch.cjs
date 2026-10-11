@@ -1654,5 +1654,3 @@ function instrumentFetch(options = {}) {
 
 exports.instrumentFetch = instrumentFetch;
 exports.registerTelemetryUrl = registerTelemetryUrl;
-//# sourceMappingURL=fetch.cjs.map
-//# sourceMappingURL=fetch.cjs.map

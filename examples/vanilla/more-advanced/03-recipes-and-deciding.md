@@ -82,13 +82,17 @@ the library unless you said so:
 | A failed `<script>`, `<img>` or `<link>` | resource error handling | `errors.captureResources: true` — **off by default** | `'resource'` |
 | A CSP violation | CSP handling | `errors.captureCsp: true` — **off by default** | `'csp'` |
 | A dynamic `import()` that fails | chunk error handling | **Nothing** — `errors.captureChunkErrors` defaults to `true` | `'chunk'` |
+| The same failure, but **you** catch the rejection | `withChunkCapture(route, loader)` | Wrapping the import is the only way the record learns the route name | `'chunk'`, with `tags.route` |
+| A `Worker` throws, or sends an unclonable message | `attachWorker(worker, { name })` from `@codewithrajat/rm-logvault/worker` | **Nothing can be automatic** — the events fire on the `Worker` object, not on `window` | `'worker'` |
+| A `Worker` that never answers | `attachWorker` with `responseTimeoutMs`, then `expectResponse(label)` | No event fires at all, so a timer is the only signal | `'worker'`, `tags.op: 'timeout'` |
+| A route loader or navigation failure | you | `captureError(error, { source: 'router', tags: { route } })` | `'router'` |
 | Something you already caught, or a wrong-but-not-fatal state | you | `captureError(error, ctx)` | whatever you pass in `ctx.source` |
 | A `console.warn` / `console.error` you did not make | console capture | `logs.captureConsole: true`, which also needs `logs.enabled: true` | filed as a **log**, not an error |
 
 The row that surprises people is the first one, in the good way: the two most common failures in a
 browser need no code from you at all. The rows that surprise people in the other direction are the
-resource and CSP rows — they are the two opt-ins, and nothing appears in the report for them until you
-turn them on.
+resource, CSP and worker rows — the first two are opt-ins, and the third cannot be automatic at all.
+Nothing appears in the report for any of them until you turn it on or attach.
 
 ## The plain-DOM equivalent of the framework machinery
 

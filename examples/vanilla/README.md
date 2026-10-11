@@ -23,7 +23,7 @@ The library is framework-agnostic, which makes this the reference tree. The othe
 | [basic](./basic/README.md) | the one call, and where it goes | [capture recipes](./basic/01-capture-recipes.md) — the four ways an error gets recorded |
 | [advanced](./advanced/README.md) | uploads, retention and budgets | [the outbox](./advanced/01-the-outbox.md), [retention and payload budgets](./advanced/02-retention-and-payload-budgets.md), [what arrives at your collector](./advanced/02-what-arrives-at-the-collector.md) |
 | [config](./config/README.md) | the full option surface | [options at a glance](./config/01-options-at-a-glance.md), [environment variables](./config/02-environment-variables.md), [levels and thresholds](./config/03-levels-and-thresholds.md) |
-| [more-advanced](./more-advanced/README.md) | the replaceable seams, indexed | [custom repository](./more-advanced/01-custom-repository.md), [transport and logSource](./more-advanced/02-custom-transport-and-log-source.md), [hooks and automation](./more-advanced/03-lifecycle-hooks-and-automation.md), [the recipes and choosing between them](./more-advanced/03-recipes-and-deciding.md) |
+| [more-advanced](./more-advanced/README.md) | the replaceable seams, indexed | [custom repository](./more-advanced/01-custom-repository.md), [transport and logSource](./more-advanced/02-custom-transport-and-log-source.md), [hooks and automation](./more-advanced/03-lifecycle-hooks-and-automation.md), [the recipes and choosing between them](./more-advanced/03-recipes-and-deciding.md), [workers and dynamic imports](./more-advanced/07-workers-and-dynamic-imports.md), [duplicates, floods and testing](./more-advanced/08-dedupe-throttling-and-testing.md) |
 
 ## Read them in this order
 

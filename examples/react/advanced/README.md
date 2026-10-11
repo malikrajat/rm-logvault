@@ -67,6 +67,7 @@ tier 1.
 | `rest.batchSize` | records per request | `50` | Set to `20` for smaller requests and finer retry granularity. |
 | `rest.intervalMs` | milliseconds | `30000` | The floor between flushes **after a success**; failures use exponential backoff and `Retry-After`. |
 | `errors.retentionDays` / `maxRecords` / `maxPayloadBytes` | days / rows / UTF-8 bytes | `7` / `500` / `16384` | Set explicitly to show they are choices, not constants. |
+| `errors.maxEventsPerMinute` / `maxRepeatsPerMinute` | events / 60 s, records per fingerprint / 60 s | `120` / `12` | The two caps that decide what gets dropped when something fails in a loop. |
 | `logs.level` | level | `'warn'` | Raised to `'info'` so `logger.info(...)` is stored. `logger.debug(...)` is neither printed nor stored at the default console level — see [levels and thresholds](../config/03-levels-and-thresholds.md). |
 
 The reasoning behind each of these — including why `maxPayloadBytes` is a ladder rather than a

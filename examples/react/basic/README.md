@@ -116,6 +116,7 @@ Everything else is defaulted, and the defaults that matter are the same ones as 
 | --- | --- |
 | `mode` | `'local'` — IndexedDB only, **no network requests at all** |
 | `errors.retentionDays` / `maxRecords` | `7` days / `500` rows |
+| `errors.maxRepeatsPerMinute` | `12` records per fingerprint per 60 s — a repeat past the cap costs no global budget |
 | `logs.retentionDays` / `maxRecords` | `3` days / `2000` rows |
 | `logs.level` | `'warn'` — the **persist** threshold |
 | `shortcut` | enabled, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>D</kbd> |

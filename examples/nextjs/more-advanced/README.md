@@ -245,11 +245,21 @@ useEffect(() => {
 - **Encryption at rest needs `crypto.subtle`, so it needs a secure context.** A plain `http:` deployment
   gets `undefined` back, and the documented fallback is to record unencrypted — see
   [06-encrypting-stored-records.md](./06-encrypting-stored-records.md).
+- **`Worker` does not exist on the server.** An `attachWorker` call has to sit behind `'use client'` and
+  must not be evaluated during a server render or the build — and `next/dynamic` is where a chunk failure
+  becomes visible on this framework. See
+  [07-workers-and-dynamic-imports.md](./07-workers-and-dynamic-imports.md).
+- **`error.tsx` and your own `catch` no longer race** for the same record; the second capture enriches
+  the first — see [08-dedupe-throttling-and-testing.md](./08-dedupe-throttling-and-testing.md).
 
 ## Next
 
 - [The recipes and choosing between them](./03-recipes-and-deciding.md) — the decision table across the
   client's error paths, what the server boundary means for each, and how to assert it in a test.
+- [Workers and dynamic imports](./07-workers-and-dynamic-imports.md) — the `'use client'` boundary, the
+  worker `URL` forms, and `withChunkCapture` inside `next/dynamic`.
+- [Duplicates, floods and testing](./08-dedupe-throttling-and-testing.md) — the dedupe rule,
+  `errors.maxRepeatsPerMinute`, `toError`, and the test doubles.
 - The Next.js adapter and server boundary in depth: [01-framework-adapter.md](./01-framework-adapter.md).
 - Watching what was captured: [04-observing-and-extending.md](./04-observing-and-extending.md).
 - Every option, boundary and invalid-value rule:

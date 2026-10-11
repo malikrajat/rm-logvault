@@ -116,6 +116,7 @@ The full treatment — `handle.events`, context builders, the sink registry and 
 | `NEXT_PUBLIC_ERROR_TRACKING_MAX_RECORDS` | `errors.maxRecords` | `maxErrors` | rows | `500` |
 | `NEXT_PUBLIC_ERROR_TRACKING_MAX_PAYLOAD_BYTES` | `errors.maxPayloadBytes` | — | UTF-8 bytes per record | `16384` |
 | `NEXT_PUBLIC_ERROR_TRACKING_MAX_EVENTS_PER_MINUTE` | `errors.maxEventsPerMinute` | — | events / 60 s; `0` = unlimited | `120` |
+| `NEXT_PUBLIC_ERROR_TRACKING_MAX_REPEATS_PER_MINUTE` | `errors.maxRepeatsPerMinute` | — | records per fingerprint / 60 s; `0` = off | `12` |
 
 ## Logs — their own IndexedDB store
 
