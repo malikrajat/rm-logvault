@@ -1,5 +1,108 @@
 import { Component, ReactNode, ErrorInfo } from 'react';
-import { E as ErrorContext } from './types--hrpBzU7.cjs';
+
+/**
+ * Shared primitives used across every module.
+ *
+ * @remarks
+ * `exactOptionalPropertyTypes` is enabled project-wide. Record and options
+ * interfaces therefore widen every optional member to `T | undefined` so that
+ * records can be assembled from partial fragments without conditional spreads.
+ * See `docs/DECISIONS.md` (D-002).
+ *
+ * @packageDocumentation
+ */
+/** An explicitly-nullable-optional value. Shorthand for `T | undefined`. */
+type Maybe<T> = T | undefined;
+/** Milliseconds since the Unix epoch. */
+type Timestamp = number;
+
+/**
+ * Error-domain types: the ingestion contract and the persisted record shape.
+ *
+ * @packageDocumentation
+ */
+
+/**
+ * Where an error entered the library.
+ *
+ * @remarks
+ * Every error funnels through a single ingestion point (`captureError`), and this
+ * is the discriminator that says which integration produced it.
+ *
+ * @remarks
+ * `vue`, `angular` and `svelte` are additions beyond the original source list,
+ * which named only `react`. Reusing `react` for every framework boundary would
+ * make the `source` field actively misleading in a report, so each framework gets
+ * its own value. See `docs/DECISIONS.md` (D-004).
+ *
+ * `router` and `timeout` are additions for the same reason. A route-loader failure
+ * filed as `'chunk'` and a silent worker filed as `'window'` both make a report
+ * lie about where the failure came from — and the two are indistinguishable from a
+ * genuine chunk-load failure and a genuine uncaught error respectively. See
+ * `docs/DECISIONS.md` (D-033).
+ */
+type ErrorSource = 'react' | 'vue' | 'angular' | 'svelte' | 'api' | 'window' | 'unhandledrejection' | 'resource' | 'chunk' | 'csp' | 'event-handler' | 'worker' | 'router' | 'timeout' | 'query' | 'storage' | 'manual';
+/** Impact of the error on the user experience. */
+type ErrorSeverity = 'fatal' | 'error' | 'warning' | 'info';
+/** Coarse classification used for grouping and dashboards. */
+type ErrorCategory = 'runtime' | 'chunk' | 'resource' | 'http' | 'network' | 'timeout' | 'abort' | 'parse' | 'auth' | 'security';
+/** Classification of an HTTP/transport failure. */
+type ApiErrorKind = 'auth' | 'abort' | 'timeout' | 'parse' | 'http' | 'network' | 'unknown';
+/** Source position of a runtime error. */
+interface ErrorLocation {
+    readonly source?: Maybe<string>;
+    readonly line?: Maybe<number>;
+    readonly column?: Maybe<number>;
+}
+/**
+ * Correlatable request metadata.
+ *
+ * @remarks
+ * Only ever populated from an explicit allow-list of fields: method, url, status,
+ * statusText, code, timeout, duration and the first present correlation header.
+ * Request/response bodies, parameters, cookies and arbitrary headers are NEVER read.
+ */
+interface ApiErrorContext {
+    readonly kind: ApiErrorKind;
+    readonly method?: Maybe<string>;
+    readonly url?: Maybe<string>;
+    readonly status?: Maybe<number>;
+    readonly statusText?: Maybe<string>;
+    readonly code?: Maybe<string>;
+    readonly timeout?: Maybe<number>;
+    readonly duration?: Maybe<number>;
+    readonly requestId?: Maybe<string>;
+}
+/** Details extracted from a DOM event (`ErrorEvent`, resource error, CSP violation). */
+interface ErrorEventInfo {
+    readonly type: string;
+    readonly targetTag?: Maybe<string>;
+    readonly resourceUrl?: Maybe<string>;
+    readonly directive?: Maybe<string>;
+    readonly blockedURI?: Maybe<string>;
+    readonly crossOrigin?: Maybe<string>;
+}
+/**
+ * Caller-supplied context for {@link ErrorRecord}.
+ *
+ * @remarks
+ * Everything is optional; omitted fields fall back to per-source defaults.
+ */
+interface ErrorContext {
+    readonly source?: Maybe<ErrorSource>;
+    readonly severity?: Maybe<ErrorSeverity>;
+    readonly category?: Maybe<ErrorCategory>;
+    readonly componentStack?: Maybe<string>;
+    readonly location?: Maybe<ErrorLocation>;
+    readonly api?: Maybe<ApiErrorContext>;
+    readonly event?: Maybe<ErrorEventInfo>;
+    readonly tags?: Maybe<Record<string, string>>;
+    readonly extra?: Maybe<Record<string, unknown>>;
+    /** Override the derived `handled` flag. */
+    readonly handled?: Maybe<boolean>;
+    /** Override the ingestion timestamp (used by pre-init replay and tests). */
+    readonly timestamp?: Maybe<Timestamp>;
+}
 
 /**
  * React adapter: an error boundary, React 19 root error handlers and a hook.

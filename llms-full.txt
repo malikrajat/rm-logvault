@@ -562,6 +562,7 @@ TelemetryState = { __logvaultState: true; initialized; options; repository; stor
     onRecoverableError -> source 'react', severity 'warning', handled true, tags.recoverable='true'
   useErrorCapture(context?: ErrorContext): (error: unknown, extra?: ErrorContext) => void
   All three funnel into captureError; identity dedup prevents double records.
+  Module directive: 'use client' is the first statement of dist/react.js and dist/react.cjs, so a Next.js App Router Server Component may import TelemetryErrorBoundary directly and every export here is client-side. A function `fallback` still cannot cross the RSC boundary. The other ten entries carry no directive, so the core stays importable in Node, SSR and a Web Worker.
 
 @codewithrajat/rm-logvault/vue
   attachVueTelemetry(app: App, options?: { context?: ErrorContext; captureWarnings?: boolean = true }): void

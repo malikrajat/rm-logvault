@@ -3488,6 +3488,18 @@ Peer: `react >= 17`. All three entry points funnel into `captureError` with `sou
 failure that reaches the boundary _and_ the root still produces one record — the pipeline's
 identity-based deduplication handles that.
 
+> **Module directive.** This entry is built with `'use client'` as the first statement of
+> `dist/react.js` and `dist/react.cjs`, so Next.js treats the whole module as a client boundary: a
+> Server Component can import `TelemetryErrorBoundary` and render it without a wrapper client file of
+> its own. Two consequences follow. Every export here is client-side, which costs nothing real —
+> `reactRootErrorHandlers` is for `createRoot`, and `useErrorCapture` is documented for use inside
+> components — but it does mean a future server-safe React helper cannot live in this entry. And a
+> **function** `fallback` still cannot be handed over from a Server Component, because functions are not
+> serializable across the RSC boundary: pass an element there, or render the boundary from a client
+> component when you need `reset`. Outside a Next build the directive is an inert string expression and
+> nothing changes, and the other ten entries carry no directive, deliberately, because the core has to
+> stay importable in Node, in an SSR render and in a Web Worker.
+
 #### `TelemetryErrorBoundary`
 
 ```tsx

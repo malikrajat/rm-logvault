@@ -2648,4 +2648,108 @@ Angular or axios is inlined by accident, and React alone is ~45 kB. The new `/wo
 - Anything further belongs behind a subpath first. The `/worker` adapter in this release is the model:
   a real feature, no core cost.
 
+---
+
+## D-038 — The React entry carries `'use client'`, and `clean` moves outside `tsup`
+
+**Status:** Accepted
+
+**Context.** `dist/react.js` exported `TelemetryErrorBoundary` — a `Component` subclass with state,
+declared in `src/adapters/react.tsx` — with no `'use client'` directive, while the package documents
+Next.js. A consumer on the App Router who imported the boundary from a Server Component was told the
+component had to be a Client Component, and the remedy was on them.
+
+The directive cannot be left to the source file. A `'use client'` prologue in the entry module is not
+enough, because the directive has to survive bundling as the *first* statement of the emitted file;
+that is why the ecosystem ships esbuild plugins whose only job is to preserve directives, and why the
+request is tracked upstream at
+[evanw/esbuild#3115](https://github.com/evanw/esbuild/issues/3115). `banner` is tsup's supported
+mechanism — and it is an option of a **build**, not of an entry, so the React entry has to be built
+separately. That is where the second half of this decision comes from.
+
+`defineConfig` accepts an array, and tsup runs the members **concurrently** (`Promise.all`, in
+`node_modules/tsup/dist/index.js`). `clean` is not a tidy-up of the current build's own outputs: it is
+`removeFiles(["**/*"], outDir)`, and when `dts` is on it is *also*
+`removeFiles(["**/*.d.{ts,mts,cts}"], outDir)` at the start of that build's declaration rollup
+(`cleanDtsFiles`). tsup's JavaScript wipe deliberately excludes `*.d.{ts,cts,mts}` for exactly that
+reason — the two wipes are independent, and each is gated on `clean` alone.
+
+So with `clean: true` on one config of an array, the two builds' declaration rollups are unordered
+relative to each other, and the likely loser is the one-entry build's `dist/react.d.ts`: with a tenth
+of the entries to prepare, its TypeScript program can be ready — and its file written — before the
+ten-entry build's declaration wipe runs. The result would be a declaration the `exports` map points at,
+missing from `dist`, on some runs and not others. `attw --pack` and `scripts/verify-package-files.mjs`
+would catch it, but as an intermittent failure that reproduces on a developer's machine and not in CI,
+which is the most expensive kind to diagnose.
+
+**Decision.** The React entry is a second `defineConfig` member carrying
+`banner: { js: "'use client';" }`, and **no build cleans**. `dist/` is removed once, before `tsup`
+starts, by the `build` script:
+
+```json
+"build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsup && node scripts/verify-package-files.mjs"
+```
+
+The packaging gate is the last step, which is where D-031 always said it belonged: a build that
+produces a tarball no resolver can use is a failed build, and it is cheaper to learn that from
+`pnpm run build` than from publint's twenty-line symptom list afterwards.
+
+`banner` on its own does not work, and its failure is silent. tsup does pass `banner` to esbuild, but
+with `treeshake` on it regenerates every chunk through a rollup pass (`treeShakingPlugin` →
+`bundle.generate(...)`) whose output options carry no banner, so the directive is dropped and nothing
+reports it. The React build therefore sets **`treeshake: false`** — esbuild then writes that chunk
+itself, banner included. Consumers tree-shake the ESM output regardless, so the cost of the trade lands
+on the CJS copy of a single adapter, which `pnpm run size:consumers` measures. The first attempt at this
+shipped `banner` with treeshaking on, and the built `dist/react.js` began with
+`import { Component } from 'react';` — no error, no warning, and a changelog entry describing behaviour
+the artifact did not have. `scripts/verify-package-files.mjs` now asserts that `/react` declares the
+directive and that the core entry does not, so the next silent regression fails the build.
+
+`node -e` rather than a resident script because it is one line with no dependency and no new file to
+document. A `prebuild` script is not an alternative: pnpm does not run `pre`/`post` scripts unless
+`enable-pre-post-scripts` is set, so the wipe would silently not happen.
+
+The directive stays on this entry alone. A global `banner` would make all eleven entries client-only,
+and the core has to remain importable in Node, in an SSR render and in a Web Worker
+([I-4](../AGENTS.md)) — the same reason the core reads no build-time environment.
+
+**Alternatives considered.**
+
+1. **`clean: true` on the first config and `false` on the second.** Rejected: this is the race described
+   above, not a mitigation of it. The ordering is not guaranteed, because it depends on which of two
+   concurrent compilations finishes first.
+2. **`clean: true` on the fast (React) config instead, on the theory that it finishes first.**
+   Rejected: it converts a likely failure into an unlikely one, and adds a second race in the other
+   direction — that build's JavaScript wipe would remove the ten-entry build's output if the larger
+   build's esbuild pass happened to finish first. Trading a probable flake for an improbable one is not
+   a fix.
+3. **A single config with a global `banner`.** Rejected: `'use client'` on `index`, `http`, `storage`
+   and `worker` would break the Node, SSR and worker use the core promises.
+4. **`rmSync` at module scope in `tsup.config.ts`.** Rejected: it puts a destructive side effect in a
+   file that describes a build, and any tool that ever evaluates the config rather than reading it
+   would delete `dist/`.
+5. **Two config files and two sequential `tsup` invocations.** Rejected: it duplicates the shared option
+   block, or adds a third module to import it from, in order to avoid a concurrency hazard that a single
+   pre-clean removes outright. It stays the fallback if a future option cannot be expressed per build.
+
+**Consequences.**
+
+- The published React entry is usable from a Server Component without the consumer adding a directive
+  of their own.
+- The build now runs two concurrent tsup builds, so **every** config in the array must keep
+  `clean: false`. A future entry that needs its own `banner` or `external` follows the same pattern: add
+  it to a config, clean nothing, and let the `build` script do the wiping.
+- The whole `/react` entry becomes a client boundary, so `useErrorCapture` and `reactRootErrorHandlers`
+  are client-only as well, though both are documented for use inside components and `createRoot`. A
+  future React helper that must run on the server cannot ship in this entry.
+- The wipe is strictly stronger than the `clean` it replaces: `dist/` itself is removed, so a stale
+  `dist/.npmignore` or `.tgz` — the two artifacts `scripts/verify-package-files.mjs` warns about —
+  cannot survive into a release.
+- `pnpm run dev` (`tsup --watch`) no longer cleans, because the wipe lives in the `build` script rather
+  than in the config. Watch mode rewrites everything it owns, so this shows up only as a stale file from
+  a deleted entry point; `pnpm run build` clears it.
+- The change adds a build step and a banner, not library code: `dist/index.js` is untouched, so the 39 kB
+  budget ([D-037](#d-037--the-bundle-budget-moves-to-39-kb-for-the-adapter-and-enrichment-work)) and the
+  consumer-cost ceiling in `scripts/measure-size.mjs` are unaffected.
+
 

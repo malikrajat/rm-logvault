@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Twelve symptoms, each with the cause, how to confirm it, and the fix. Every diagnostic below works
+Sixteen symptoms, each with the cause, how to confirm it, and the fix. Every diagnostic below works
 from the browser console or from application code — there is no server-side tooling to reach for,
 because there is no server.
 
@@ -1513,6 +1513,47 @@ end; the only fields that reflect capture time are `timestamp` and the normalise
   ```ts
   initTelemetry({ appName: 'checkout', errors: { captureResources: true } });
   ```
+
+---
+
+### The React error boundary breaks a Next.js App Router build
+
+**Symptom.** A Server Component that imports `TelemetryErrorBoundary` from
+`@codewithrajat/rm-logvault/react` fails the Next.js build, complaining that the component needs to be a
+Client Component or that class components are not supported in Server Components. Adding `'use client'`
+to the importing file fixes the build, but turns that whole page into a client component.
+
+**Cause.** The App Router decides where a module runs from the first `'use client'` in its import chain,
+and on earlier versions the published `dist/react.js` carried none. The boundary is a stateful class
+component, so it cannot be rendered in the server graph, and drawing that boundary was left to the
+consumer.
+
+**Diagnosis.** Look at the first line of the file your resolver actually loaded — in your editor, or:
+
+```js
+require('node:fs')
+  .readFileSync('node_modules/@codewithrajat/rm-logvault/dist/react.js', 'utf8')
+  .split('\n')[0];
+```
+
+`'use client';` means the entry carries the directive and the problem is elsewhere. An `import … from
+'react'` line means you are on a version that predates it.
+
+**Fix.** Upgrade to a version whose `/react` entry ships the directive. Nothing else in your integration
+changes, and the core entry still has none, so an SSR import stays safe.
+
+If you cannot upgrade yet, keep a one-line wrapper of your own and import the boundary there instead:
+
+```tsx
+// app/error-boundary.tsx
+'use client';
+
+export { TelemetryErrorBoundary } from '@codewithrajat/rm-logvault/react';
+```
+
+Either way, a **function** `fallback` still cannot be passed from a Server Component, because functions
+are not serializable across the RSC boundary. Pass an element, or render the boundary from a component
+that is already a client component when you need `reset`.
 
 ---
 

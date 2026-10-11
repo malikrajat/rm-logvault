@@ -50,6 +50,17 @@ export function Providers({ children }: { readonly children: ReactNode }): React
 }
 ```
 
+## The `/react` entry carries its own `'use client'`
+
+The directive in the snippet above is on **your** provider, because that module calls `initTelemetry`.
+It is not the only one in play: the library's `/react` entry ships `'use client'` itself, so
+`TelemetryErrorBoundary` and `reactRootErrorHandlers()` can be imported straight into a server
+component, with no wrapper client file. The core entry deliberately has none — that is what keeps
+`initTelemetry` and `logger` importable on the server at all (see the section above).
+
+A **function** `fallback` is still the exception: it cannot cross the RSC boundary, so pass an element
+from a server component.
+
 ## The pre-initialisation buffer is per runtime
 
 The library buffers log calls and errors made **before** `initTelemetry` runs, and replays them into the

@@ -1,6 +1,7 @@
-import { Component } from 'react';
+'use client';
 
 // src/adapters/react.tsx
+import { Component } from "react";
 
 // src/core/env.ts
 function getGlobal(key) {
@@ -1012,6 +1013,7 @@ function createLogger() {
   return controller;
 }
 var instance = createLogger();
+var logger = instance.logger;
 function getLoggerController() {
   return instance;
 }
@@ -1410,5 +1412,8 @@ function useErrorCapture(context) {
     captureError(error, { ...context ?? {}, ...extra ?? {} });
   };
 }
-
-export { TelemetryErrorBoundary, reactRootErrorHandlers, useErrorCapture };
+export {
+  TelemetryErrorBoundary,
+  reactRootErrorHandlers,
+  useErrorCapture
+};

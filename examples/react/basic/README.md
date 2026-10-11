@@ -64,6 +64,10 @@ The one exception in this repository is Next.js, where a module can be evaluated
 the call has to be guarded by `'use client'` and moved into an effect with `destroyTelemetry` as its
 cleanup. That is a trade-off forced by SSR, not a better answer for a client-only React app.
 
+That guard is on **your** module. The library's `/react` entry ships `'use client'` of its own, so
+`TelemetryErrorBoundary` and `reactRootErrorHandlers` can be imported straight into a server component
+without a wrapper file of your own.
+
 ### The three ways a failure arrives
 
 | Failure | Who catches it | Therefore |

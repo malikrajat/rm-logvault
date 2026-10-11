@@ -80,6 +80,11 @@ them. `initTelemetry` is idempotent, so a missed cleanup would not produce dupli
 return the *existing* handle and silently ignore your options, which is a worse bug to chase. Returning
 `destroyTelemetry` is what stops one installation becoming two.
 
+**The library's `/react` entry carries its own `'use client'`.** That one is not yours to add, and it is
+what lets a server component import `TelemetryErrorBoundary` and render it directly. The two are
+unrelated: your provider needs the directive because of the `initTelemetry` call inside it, not because
+of anything the boundary requires.
+
 ### Where each failure is recorded
 
 | Failure | Path |

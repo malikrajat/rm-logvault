@@ -6,7 +6,6 @@
 [![bundle size](https://img.shields.io/bundlephobia/minzip/@codewithrajat/rm-logvault)](https://bundlephobia.com/package/@codewithrajat/rm-logvault)
 [![types](https://img.shields.io/npm/types/@codewithrajat/rm-logvault.svg)](https://www.npmjs.com/package/@codewithrajat/rm-logvault)
 [![license](https://img.shields.io/npm/l/@codewithrajat/rm-logvault.svg)](./LICENSE)
-[![CI](https://img.shields.io/github/actions/workflow/status/malikrajat/rm-logvault/ci.yml?branch=main&label=CI)](https://github.com/malikrajat/rm-logvault/actions/workflows/ci.yml)
 [![weekly](https://img.shields.io/npm/dw/@codewithrajat/rm-logvault?label=weekly)](https://www.npmjs.com/package/@codewithrajat/rm-logvault)
 [![total](https://img.shields.io/npm/dt/@codewithrajat/rm-logvault?label=total)](https://www.npmjs.com/package/@codewithrajat/rm-logvault)
 [![last update](https://img.shields.io/npm/last-update/@codewithrajat/rm-logvault)](https://www.npmjs.com/package/@codewithrajat/rm-logvault)
@@ -41,7 +40,7 @@
 ![Standalone](https://img.shields.io/badge/Standalone-supported-success)
 ![SSR safe](https://img.shields.io/badge/SSR-safe-success)
 ![Server capture](https://img.shields.io/badge/server--side%20capture-unsupported-red)
-
+<!-- [![CI](https://img.shields.io/github/actions/workflow/status/malikrajat/rm-logvault/ci.yml?branch=main&label=CI)](https://github.com/malikrajat/rm-logvault/actions/workflows/ci.yml) -->
 
 ## See It In Action
 
@@ -389,6 +388,12 @@ export function App() {
 You can use both the root handlers and a boundary. A failure that reaches both still becomes **one**
 record, because identical error objects are de-duplicated.
 
+The `/react` entry ships the `'use client'` directive, so in a Next.js App Router app you can import
+the boundary straight into a Server Component — the module is already a client boundary, and you do not
+need a wrapper client file of your own. A **function** `fallback` is the one thing that cannot cross
+that boundary: pass an element from a server component, or render the boundary from a client component
+if you need `reset`.
+
 #### Next.js (App Router)
 
 `initTelemetry` touches `window` and `indexedDB`, which only exist in the browser. `'use client'` is
@@ -412,6 +417,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
 Then render `<Providers>` around your app in `app/layout.tsx`. The `destroyTelemetry()` cleanup stops
 React's Strict Mode double-invocation from leaving a second installation behind.
+
+That directive is for **your** module, because it calls `initTelemetry` in an effect. It is a different
+one from what the library ships: `@codewithrajat/rm-logvault/react` carries its own, so the error
+boundary and the React 19 root handlers can be imported straight into a server component. The core
+entry deliberately has none — that build has to run in Node, in an SSR render and in a Web Worker.
 
 #### Vue 3
 
@@ -1191,6 +1201,8 @@ Importing is safe — no module-level code touches `window` or `indexedDB`, so t
 Node, in an SSR framework and inside a Web Worker. `initTelemetry` on the server installs nothing and
 stores nothing. In Next.js, call it from a `'use client'` component's effect, as shown in
 [Next.js (App Router)](#nextjs-app-router); that also keeps it out of the server bundle.
+`@codewithrajat/rm-logvault/react` is the one entry that ships `'use client'`, because everything it
+exports is client-side; every other entry, the core included, stays importable on the server.
 
 ### Does it work with Module Federation / microfrontends?
 

@@ -39,6 +39,20 @@ which re-renders the subtree — that is the difference between a visible failur
 `onError` is additive. Recording already happened; this is where you would also send the error somewhere
 the library does not know about.
 
+## The entry is a client boundary
+
+`@codewithrajat/rm-logvault/react` is built with `'use client'`, so in the App Router the whole module
+belongs to the client bundle: a Server Component can import `TelemetryErrorBoundary` and render it
+without a wrapper file of its own. All three exports are client-side by nature —
+`reactRootErrorHandlers()` ends up in the file that calls `createRoot`, and `useErrorCapture()` is for
+components — so the directive costs nothing real here. The corollary is that a server-safe React helper
+could not live in this entry.
+
+One limit survives the directive: a **function** `fallback` cannot be handed over from a Server
+Component, because functions are not serializable across the RSC boundary. Pass an element from a server
+component, and reach for the function form — the one that gives you `reset` — inside a component that is
+already a client component.
+
 ## `reactRootErrorHandlers(context?)`
 
 React 19 lets the **root** receive errors, which is why these exist: a render error never reaches

@@ -566,6 +566,23 @@
   min+gzip**. It inlines its own copy of the core pipeline like every other adapter, and resolves the
   one live tracker through the shared state object, so a record captured through it lands in the same
   store as one captured from the root entry. See `docs/DECISIONS.md` (D-035).
+- Ship the `'use client'` directive on the `/react` entry point, so an App Router consumer can import
+  `TelemetryErrorBoundary` from a Server Component.
+
+  The boundary is a stateful class component, so it cannot render in the server graph — and the published
+  module carried no directive, which left the consumer to draw the client boundary themselves or to meet
+  "this component needs to be a Client Component" at build time. The directive is now the first statement
+  of `dist/react.js` and `dist/react.cjs`, and the whole entry is a client module as a result.
+
+  That costs nothing real — `reactRootErrorHandlers` belongs in the file that calls `createRoot`, and
+  `useErrorCapture` is documented for use inside components — but it does mean a server-safe React helper
+  could not live in this entry. One limit also survives the directive: a **function** `fallback` still
+  cannot be handed over from a Server Component, because functions are not serializable across the RSC
+  boundary. Pass an element from a server component, or render the boundary from a component that is
+  already a client component when you need `reset`.
+
+  The directive is applied to this entry alone. The other ten carry none, deliberately: the core has to
+  stay importable in Node, in an SSR render and in a Web Worker. See `docs/DECISIONS.md` (D-038).
 
 ## 1.0.0
 
