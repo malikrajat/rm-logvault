@@ -2752,4 +2752,192 @@ and the core has to remain importable in Node, in an SSR render and in a Web Wor
   budget ([D-037](#d-037--the-bundle-budget-moves-to-39-kb-for-the-adapter-and-enrichment-work)) and the
   consumer-cost ceiling in `scripts/measure-size.mjs` are unaffected.
 
+---
+
+## D-039 — The bundle budget moves to 43 kB for the diagnostics report filter builder
+
+**Status:** Accepted
+
+**Context.** `size-limit` gated `dist/index.js` at **39 kB** min+gzip, measured at **37.91 kB** — about
+1.1 kB of headroom, deliberately tight
+([D-037](#d-037--the-bundle-budget-moves-to-39-kb-for-the-adapter-and-enrichment-work)).
+
+IndexedDB is scoped to an **origin**, and nothing the library can do changes that. So a parent site and
+its sub-apps, a host page and its widgets, and every microfrontend on one domain all write into the same
+`rm-logvault-errors` vault — the correct default, because it is what makes one report able to describe a
+whole incident. The cost lands at read time: the downloaded HTML report mixed every application's rows,
+and the viewer could narrow it only by free-text search, by severity, by log level and by page load. None
+of those is the identity the library already stamps onto every record, so a developer holding a report
+from a shared vault could not get to their own module without reading the whole table.
+
+**Decision.** The embedded viewer gains a **faceted filter builder**: a field dropdown, an `is` / `is not`
+comparison, and a value dropdown auto-filled from the values that actually exist in the payload and
+**cascaded** against the filters already applied, so no offered value is a dead end. Filters accumulate as
+removable chips. The fields are `appName`, `appVersion`, `buildId`, `environment`, `route`, `pageLoadId`,
+`source`, `severity`, `category`, `name`, `uploadStatus`, `platform` and `level`, plus one field per tag
+key discovered in the records, and the values are reachable in one click from the application pills in the
+log table and the identity pills in the drill-down.
+
+The budget moves to **43 kB** min+gzip. Measured, on this change, with `pnpm run build && pnpm run size`:
+
+| | before | after | delta |
+| --- | --- | --- | --- |
+| `dist/index.js` min+gzip | 37.91 kB | **42.06 kB** | +4.15 kB |
+| `size-limit` budget | 39 kB | **43 kB** | +4 kB |
+
+The same measurement moves the consumer-cost ceiling in `scripts/measure-size.mjs`
+(`GZIP_CEILING_BYTES`) from 37 000 to **41 000 bytes**, because the largest representative consumer entry
+point — `events + context builders` — grew to **38.78 kB** min+gzip and tripped it. It remains a
+peer-dependency tripwire rather than a feature budget.
+
+**Where the 4.15 kB goes, measured rather than asserted.** The viewer is a **string literal**, so esbuild
+cannot minify it: every space, newline and comment is shipped verbatim, and gzip is the only thing that
+compresses it. Measured by gzipping the extracted viewer, it is 30.1 kB of source and **7.74 kB** gzipped,
+of which **1.30 kB** is its 45 lines of comments. Those comments were already trimmed once on this change
+— the long rationale moved into this entry and into [API.md](API.md#the-embedded-viewer) — for a measured
+saving of 0.38 kB (42.18 → 41.80 kB at that point in the change). Removing every remaining comment would
+save the 1.30 kB, and the peripheral affordances (the one-click identity pills, the drill-down quick
+filters, the sticky-bar height sync) a further ~0.6 kB; together that is still short of 4.15 kB, and it
+would cost the readability of a program that neither `tsc` nor Biome can review.
+
+**Alternatives considered.**
+
+1. **Move the report generator behind a subpath.** Rejected: `renderDiagnosticsReport`, `buildReportPayload`,
+   `escapeHtml`, `escapeJsonText`, `encodeJsonForHtml` and `exportDiagnosticsReport` are all exported from
+   the root entry today. Moving them is a breaking change to the public API, it breaks the documented
+   `exportDiagnosticsReport()` call, and `initTelemetry` wires the `Ctrl+Shift+Alt+D` shortcut to the export
+   directly, so the shortcut would have to import a subpath into the core.
+2. **Precompute the value lists in TypeScript and interpolate them as static markup.** Rejected: it removes
+   only `buildFacetOptions` (~0.7 kB gzipped), because the cascade has to be evaluated against whichever
+   filters are active at the time, so the matching logic ships either way — and it creates exactly the
+   injection surface the viewer is designed to avoid, by letting record values reach markup through string
+   concatenation instead of `textContent`.
+3. **Make the filter builder opt-in.** Rejected: an option cannot remove bytes from a synchronous string
+   generator. The viewer is built into the entry point whether or not anyone opens a report.
+4. **Strip every comment from the viewer.** Rejected: the viewer is ES5 shipped as text, so neither `tsc`
+   nor Biome can see it — a typo in it is invisible until somebody opens a report during an incident.
+   Comments are the only review surface it has, and they are already at 37 lines for 29.5 kB of program.
+5. **Keep 39 kB and ship no filter.** Rejected: an origin-shared vault is not an edge case, it is what the
+   platform does, and the filtered question — "which of these rows are mine?" — is the first one a reader
+   asks. A report that cannot answer it sends the reader to DevTools instead.
+6. **Raise to a round 45 kB.** Rejected: every previous raise was set just above the measurement (32 kB at
+   31.01, 37 kB at 36.55, 39 kB at 37.91). 43 kB at 42.06 kB keeps about 1.2 kB of headroom — roughly one
+   feature's worth — which is what keeps a silently bundled dependency a build failure rather than a
+   rounding error.
+
+**Consequences.**
+
+- This is the fifth measured raise, and the 12 kB target from the original brief is now more than three and
+  a half times exceeded. The reasoning of
+  [D-013](#d-013--the-bundle-budget-is-30-kb-mingzip-not-12-kb) applies unchanged: the number is a
+  **regression guard, not an aspiration**.
+- The report viewer is now the largest single contributor to the core entry, and it is unminifiable by
+  construction. Any further growth in it deserves the same measurement this entry records, and the next
+  *feature* belongs behind a subpath.
+- A filter on a field that one kind of record does not carry is skipped for that kind. `severity` is an
+  error field and `level` is a log field, so "severity is error" narrows the errors table and leaves the log
+  table alone rather than reporting it as filtered out. Emptying a table a filter does not describe would
+  look like data loss.
+- The value lists are derived from the payload on every render, so the report remains a single
+  self-contained file with no configuration: no field list to maintain, and no value list to keep in step
+  with the applications that share the vault.
+
+---
+
+## D-040 — Console capture suppresses the library's own console output
+
+**Status:** Accepted
+
+**Context.** The library keeps two IndexedDB databases, `${dbPrefix}-errors` (aggregating
+`ErrorRecord`s, written by `captureError` and everything that funnels into it) and `${dbPrefix}-logs`
+(append-only `LogRecord`s, written by `logger.*` and by opt-in console capture). They are separate on
+purpose — different retention, payload budgets, rate limits, upload endpoints and record shapes — but
+the split is a rule an **application** has to follow, not merely a fact about the code: two calls for
+one failure produce one row in each database, with the same `pageLoadId`, route and timestamp, and in
+the diagnostics viewer that is indistinguishable from duplication.
+
+That was reported as "the same entry is inserted into both databases". Investigating it produced three
+distinct causes, and only one of them was a defect in this library:
+
+1. **`captureError(error)` next to `logger.error(msg, error)`.** Two record kinds, two stores, by
+   design. `logger.error` has never captured an `Error` at any level — that classification was
+   established in 1.0.1 (`CHANGELOG.md`, and [API.md](API.md#logger)) and is restated as a rule in
+   [ERRORS-VS-LOGS.md](ERRORS-VS-LOGS.md). What was missing was one place that said it.
+2. **`captureError(error)` next to `console.error(error)` with `logs.captureConsole: true`.** The same
+   shape with the browser console as the log side. Expected behaviour, undocumented interaction.
+3. **A genuine library defect, twice over, in console capture.** `TelemetryErrorHandler.handleError`
+   reports with `captureError` and then delegates to `console.error` so Angular's default diagnostics
+   are preserved. With `captureConsole: true` that delegation was persisted as a `[console]`
+   `LogRecord`, so a project using two documented options — `provideTelemetryErrorHandler()` and
+   `logs.captureConsole: true` — filed every handler failure in **both** databases with no application
+   code at fault. Separately, a captured console call was echoed by the library's own console writer, so
+   `console.warn('hello')` printed twice: once verbatim and once as `[rm-logvault] hello`.
+
+**Decision.** Fix cause 3 in the code, and turn causes 1 and 2 into one authoritative document.
+
+_Code._ An internal suppression window, `withConsoleCaptureSuppressed` in `src/core/state.ts`, is
+opened around the only two places the library writes to the console on its own behalf — the logger's
+console writer and the Angular adapter's delegation. The wrapper in `src/logger/consoleCapture.ts`
+still calls the original method, so nothing is silenced, and skips only the ingestion half. The depth
+counter lives on the shared `globalThis[Symbol.for('logvault@1')]` state, because the adapter entries
+are separate bundles that inline their own copy of `consoleCapture.ts` and could not otherwise mute the
+wrapper the core entry installed. Because the two sites nest, the flag is a counter rather than a
+boolean. In the same change, `emit` gained an internal `toConsole` flag and the capture callback passes
+`false`, so a console call the application already printed is persisted without a second printed copy —
+previously that was prevented only by the `busy` ordering inside `emit`, which is an accident rather
+than an invariant.
+
+_Documentation._ [ERRORS-VS-LOGS.md](ERRORS-VS-LOGS.md) states the rule ("for one event, call exactly
+one of them"), lists every API on each side of the split with the `source` or `level` it produces,
+names the three ways the duplicate pattern arises, and records that case 3 is fixed in 1.0.2. It is
+linked from `README.md`, the `docs/README.md` index, `API.md` (§`logger` and §`captureError`),
+`TROUBLESHOOTING.md`, `ARCHITECTURE.md`, `llms.txt` and `llms-full.txt`.
+
+**Alternatives considered.**
+
+1. **Document causes 1 and 2 and leave console capture alone.** Rejected: cause 3 needs no mistake by
+   the application. Two documented options used together must not file one failure twice.
+2. **Make `logger.error(msg, error)` capture the error as well.** Rejected: it produces exactly the
+   duplication being reported, in the other direction. A log call stays a log call; the destination is
+   chosen by the API, not by the level, and the 1.0.1 changelog entry, the `logger` section of
+   [API.md](API.md#logger) and [ERRORS-VS-LOGS.md](ERRORS-VS-LOGS.md) exist to keep it that way.
+3. **Have the wrapper skip console capture when the first argument is an `Error`.** Rejected: it would
+   silently drop legitimate application `console.error(error)` calls, and it makes a general-purpose
+   wrapper decide what the caller meant from an argument's type.
+4. **Hold the mute flag in `src/logger/consoleCapture.ts` as a module-level boolean.** Rejected twice
+   over: module scope is invisible across the adapter seam (the Angular entry has its own copy), and a
+   boolean lets the inner of two nested sites unmute the outer one early.
+5. **Put `withConsoleCaptureSuppressed` in `consoleCapture.ts` and import it from the Angular adapter.**
+   Rejected on a measurement: bundling that module into the `/angular` entry costs **1.07 kB**
+   min+gzip (`esbuild`, minified, external peers) for a fifteen-line helper, because the entry would
+   then carry `installConsoleCapture` as well. `core/state.ts` is already inlined in every adapter
+   entry through `captureError`, so the same helper costs approximately nothing there.
+6. **Suppress by disabling the logger around the delegation** (`logger.setEnabled(false)` and restore).
+   Rejected: it mutates shared, publicly readable configuration to avoid storing one line, and it
+   suppresses every sink rather than the one thing that needs suppressing.
+7. **Filter the duplicates out of the diagnostics report instead** — hide a log row whose message and
+   timestamp match an error row. Rejected: the two rows are different records in different stores, both
+   genuinely written, and a viewer that hides stored rows makes the report disagree with the database it
+   claims to describe. The report already joins the two tables on `pageLoadId`, which is the honest
+   version of "show me these together".
+
+**Consequences.**
+
+- **Two behaviour changes, both fixes.** A captured `console.warn`/`console.error` is printed once
+  rather than twice, and an Angular failure handled by `TelemetryErrorHandler` produces one error record
+  and no `[console]` log record. A project that came to rely on those `[console]` rows loses them; that
+  is the defect being removed, not a feature being withdrawn.
+- **The classification is now one page.** `docs/ERRORS-VS-LOGS.md` is the reference; the other
+  documents link to it instead of restating the table, so the next drift has one place to be corrected.
+- **`TelemetryState` gains a field.** `consoleCaptureSuppressed: number` is additive on an exported
+  type, backfilled by `repairState` for a state object written by an older build — the same mechanism
+  `captureSuppressed`, `errorTracker`, `preInitErrors` and `eventEmitter` use
+  ([D-026](#d-026--the-error-tracker-lives-on-the-shared-state-because-adapter-bundles-inline-the-core)) —
+  and reset by `resetState`. The helper itself is not exported from `src/index.ts`.
+- **The core budget absorbs it without a raise.** Measured with `pnpm run build && pnpm run size`:
+  42.06 kB to **42.16 kB** min+gzip against the 43 kB limit from
+  [D-039](#d-039--the-bundle-budget-moves-to-43-kb-for-the-diagnostics-report-filter-builder), i.e.
+  +0.10 kB. No budget ADR is required, and the `/angular` consumer entry grows by the few bytes of the
+  counter helper rather than by a whole module, which is what alternative 5 measured.
+
 

@@ -364,13 +364,15 @@ per batch.
 - **Type** `string | undefined` (each). **Default** none — `undefined`. **When** per record.
 - **What it does.** Stamps your application's identity onto every error record's `environment`
   block and every log record's narrower `environment` block. `appName` is also the value on the
-  handle (`initTelemetry(...).appName`), and all four appear in the diagnostics report header and
+  handle (`initTelemetry(...).appName`), and all four appear in the diagnostics report header, in
+  the report's **Filter by** dropdown as `App name`, `App version`, `Build` and `Environment`, and
   in the REST batch envelope's `app` object (`''` when unset).
-- **What it does not do.** It does not tag or filter anything, and it is **not** a redaction
-  boundary: each value passes through `sanitizer.text(value, 200)` when the block is built, so a
-  token accidentally placed in `appVersion` is redacted on the way in, and the stored value is
-  truncated to 200 characters. It also does not group records — that is `fingerprint`, which is
-  built from the error's own fields.
+- **What it does not do.** It does not group records — two applications sharing an origin and a
+  `dbPrefix` write into one vault, and these fields are what the report's filter uses to tell their
+  rows apart. It is **not** a redaction boundary: each value passes through
+  `sanitizer.text(value, 200)` when the block is built, so a token accidentally placed in
+  `appVersion` is redacted on the way in, and the stored value is truncated to 200 characters.
+  Grouping is `fingerprint`, which is built from the error's own fields.
 - **Values.** Any non-empty string. The value is `.trim()`ed, so `'  checkout  '` stores
   `'checkout'`.
 - **Invalid input.** A non-string, `''` or a whitespace-only string is ignored: the field stays
@@ -640,7 +642,10 @@ override, and there is no nested option that an alias can override.
 - **Values.** Only the literals `true` and `false`; anything else is ignored and the nested option
   (then the default) applies. `'false'` is not `false`.
 - It wraps `console.warn` and `console.error` **only**, under `logs.enabled`, and the wrapper is
-  removed again by `destroyTelemetry()`.
+  removed again by `destroyTelemetry()`. Captured calls become **log** records: a captured
+  `console.error` never creates an error record, and console output the library itself produces is
+  never stored ([ERRORS-VS-LOGS.md](ERRORS-VS-LOGS.md), and see
+  [`logs.captureConsole`](#logscaptureconsole)).
 
 ### `maxErrors`
 
@@ -1129,15 +1134,24 @@ either. The other twelve aliases feed a field that does have one; see §4a.
     `console.trace` — only `warn` and `error`.
   - It does **not** change what the console prints: the original method runs **first**, with the
     original `this`, so DevTools formatting and application behaviour are unchanged.
+  - It does **not** produce an error record. A captured `console.error(...)` is a `LogRecord` with
+    `level: 'error'` in `${dbPrefix}-logs`; `${dbPrefix}-errors` is written only by `captureError` and
+    the handlers that funnel into it ([ERRORS-VS-LOGS.md](ERRORS-VS-LOGS.md)).
+  - It does **not** capture output the **library** writes to the console on its own behalf — the
+    logger's own diagnostics, or the `console.error` the Angular adapter delegates to after reporting.
+    Those still print; they are not stored. Before 1.0.2 the Angular delegation was stored as a
+    `[console]` log record *in addition to* the error record, so one handler failure appeared in both
+    databases, and a captured call was also echoed a second time by the library's own writer.
   - It does not recurse: a message emitted while the library is already ingesting one is dropped by
     a re-entrancy guard. And restore-on-teardown only puts the originals back **if the property is
     still our wrapper** — if application code replaced it afterwards, theirs is left in place.
 - **Values.** Only `true` / `false`; anything else is ignored and `false` applies.
 - **Interaction.** Gated on `logs.enabled` too: `logs: { enabled: false, captureConsole: true }`
-  installs nothing. A captured call enters the pipeline **at the sink**, not through the logger's
-  `emit`, so two details follow: `logger.setLevel('off')` cannot suppress it (that setting only
-  touches console output), and `logs.level` still filters it — a captured `console.warn` that does
-  not pass `level: 'error'` is printed and then discarded rather than persisted.
+  installs nothing. A captured call enters the log pipeline through the same `emit` path as a
+  `logger.*` call, with the console echo switched off because the application has already printed it.
+  Two details follow: `logger.setLevel('off')` cannot suppress it (that setting only controls the
+  library's own console output), and `logs.level` still filters it — a captured `console.warn` below
+  the persist level is printed and then discarded rather than stored.
 
 ### `logs.beforeStore`
 

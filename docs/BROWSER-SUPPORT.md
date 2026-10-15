@@ -94,7 +94,54 @@ vaults, which is correct and intended. A widget inside a fully sandboxed frame k
 `Storage Access API` only if you genuinely need unpartitioned state, and expect it to require user
 interaction.
 
-### 2.4 Quota and eviction
+### 2.4 One origin is one vault: subdomains do not share, paths do
+
+Storage is keyed to an **origin**, and an origin is scheme **+** host **+** port. Nothing the library can
+do changes that, and it never tries: it uses `globalThis.indexedDB`, which is exactly as wide as the
+origin it runs in.
+
+So these are all **different** origins, and each keeps its own `rm-logvault-errors` and
+`rm-logvault-logs`:
+
+| | Why it differs |
+| --- | --- |
+| `https://example.com` vs `https://admin.example.com` | different host — a subdomain is a different origin, not a subdirectory |
+| `https://example.com` vs `https://www.example.com` | different host, however alike they look |
+| `https://example.com` vs `http://example.com` | different scheme |
+| `https://example.com` vs `https://example.com:8443` | different port |
+| `http://localhost:3000` vs `http://localhost:4200` | two dev servers are two origins |
+
+And these all share **one** vault, because the origin is identical:
+
+- a parent site and a sub-application mounted on a path of the same host (`/` and `/admin`);
+- microfrontends, module-federation remotes and web components on one page;
+- a same-origin `<iframe>`;
+- every tab and window of that origin — which is why a claim carries a lease rather than a lock
+  ([ARCHITECTURE.md](ARCHITECTURE.md#6-uploadstatus-lifecycle)).
+
+**What this means for logVault.** A report generated on `https://example.com` can never contain rows from
+`https://admin.example.com`; there is no API that reads across origins, and no plan to add one. The
+consequence inverts the question:
+
+- **Different subdomains, different ports, or http vs https.** Each has its own vault and therefore its
+  own report. There is nothing to filter, because the other application's rows were never in the file. A
+  report that looks empty is far more often the wrong origin (or a private window, §2.2) than a bug.
+- **Same origin.** A parent site and its sub-apps write into **one** vault, and a downloaded report will
+  mix them. That is the intended default — it is what lets a single file describe a whole incident — and
+  it is why the report's viewer ships a filter builder: filter the report by `App name`, `App version`,
+  `Build` or `Environment` to get to your own module, or press **Only this app**. Every record carries
+  those fields because `initTelemetry` stamps them onto each one. See
+  [API.md](API.md#the-embedded-viewer).
+
+If you would rather keep the applications separately, give each a distinct `dbPrefix` — that points the
+library at a different pair of databases, so the vaults cannot mix. The trade is explicit: a single report
+can then no longer describe both, existing rows are not migrated, and the shortcut's report on one host
+will never show the other's.
+
+> Source note: partitioning (§2.3) adds a second key on top of the origin. In a third-party frame the bucket
+> is keyed by the top-level site as well, so the same frame on two customer sites gets two buckets.
+
+### 2.5 Quota and eviction
 
 Storage is **best-effort** by default: it survives until the origin is over quota, the device is short of
 space, or the user clears it. Each engine picks its own ceiling — for Firefox, [the smaller of 10% of the
@@ -110,7 +157,7 @@ storage layer classifies as `quota` and reports through `onInternalError` as `st
 `maxRecords` and `retentionDays` options exist to stay well below the ceiling; consider asking for
 persistent storage if the vault is the only copy of anything.
 
-### 2.5 A schema upgrade blocked by another tab
+### 2.6 A schema upgrade blocked by another tab
 
 If one tab is mid-upgrade and another tab holds an older connection open, `open()` never fires
 `success` or `error`; it fires `blocked`.
@@ -121,7 +168,7 @@ the attempt is reported as `storage (transaction)` and treated as a failure, and
 completes the open anyway, that late handle is closed rather than leaked. A `versionchange` event on an
 open connection closes it immediately so *our* tab never blocks someone else's upgrade.
 
-### 2.6 Site data cleared underneath a running page
+### 2.7 Site data cleared underneath a running page
 
 A user can clear site data, or a browser can drop a connection, while the page is still open.
 

@@ -17,6 +17,7 @@ src/
 │  ├─ config.ts                 TelemetryOptions, DEFAULT_OPTIONS, resolveOptions, databaseNames
 │  ├─ init.ts                   initTelemetry, setupTelemetry, destroyTelemetry, flush/sync/status
 │  ├─ state.ts                  the globalThis[Symbol.for('logvault@1')] singleton + CleanupRegistry
+│  │                            + withConsoleCaptureSuppressed (cross-bundle, see §7.3a)
 │  ├─ events.ts                 createEventEmitter: the throwing-proof observer surface
 │  ├─ env.ts                    feature-detected global access, fromEnv, isBrowser, isOnline
 │  ├─ page.ts                   currentPageInfo, currentRoute, currentEnvironment
@@ -44,7 +45,7 @@ src/
 │  ├─ sinkRegistry.ts           named sinks: list, look up, detach by key
 │  ├─ logTracker.ts             the persist-level sink, batching, persist rate limit
 │  ├─ consoleWriter.ts          the only module allowed to touch console.*
-│  ├─ consoleCapture.ts         opt-in console.warn/error wrapper
+│  ├─ consoleCapture.ts         opt-in console.warn/error wrapper (never captures our own output)
 │  └─ logger.constants.ts       level ladder, priorities, reserved prefixes, batch sizes
 ├─ handlers/globalHandlers.ts   onerror (chained), unhandledrejection, resources, CSP, Vite
 ├─ storage/
@@ -230,6 +231,11 @@ lands in `rm-logvault-logs`, because it is a `LogRecord` carrying `level: 'error
 `captureError`, the framework adapters and the global handlers in [§2](#2-the-capture-pipeline). The
 two record kinds exist because they behave differently: error rows aggregate on `fingerprint` while
 pending, log rows are appended one per call.
+
+That split is a rule an application has to follow rather than merely a fact about the code, because
+calling an error API *and* a logging API for one event produces one row in each database and looks
+exactly like duplication. The classification — every API on each side, and the three ways the pattern
+arises — is [ERRORS-VS-LOGS.md](ERRORS-VS-LOGS.md).
 
 `PRE_INIT_LOG_BUFFER_SIZE` is 50. The write batch size and flush interval default to 50 records and
 1000 ms — the values of `LOG_FLUSH_BATCH_SIZE` and `LOG_FLUSH_INTERVAL_MS`, which a consumer can
@@ -675,6 +681,60 @@ There is a fourth, adjacent guard: **`isInternalMessage`**. A message beginning 
 `[ErrorTracking]`, `[LogTracking]`, `[Telemetry]` or `[DiagnosticsExport]` is never turned into a
 record. Without it, `reportInternalFailure('persist', …)` — emitted through the logger — would be
 persisted, fail, and report itself again.
+
+### 7.3a The console-capture suppression window
+
+**Where:** `withConsoleCaptureSuppressed` in `src/core/state.ts`, read by the wrapper in
+`src/logger/consoleCapture.ts`.
+
+The re-entrancy guard above stops a *record* from recursing. It does not answer the different question
+`logs.captureConsole` raises: when the **library** writes to the console on its own behalf, is that an
+application log call? It is not, and treating it as one was a defect in 1.0.0 and 1.0.1 with two
+symptoms:
+
+- `console.warn('hello')` was captured, and then the capture was echoed through the library's own
+  writer, so the line printed **twice** — once verbatim and once as `[rm-logvault] hello`.
+- `TelemetryErrorHandler.handleError` reports with `captureError` and then delegates to
+  `console.error` so Angular's default diagnostics survive. With `captureConsole: true` that
+  delegation was persisted too, so one Angular failure landed in **both** databases — an `ErrorRecord`
+  in `rm-logvault-errors` and a `[console]` `LogRecord` in `rm-logvault-logs` — with no application
+  code at fault.
+
+The fix is a depth counter that the wrapper consults before it ingests, while still running the
+original method:
+
+```ts
+// src/logger/consoleCapture.ts — the wrapper's step 2
+if (ingesting || isConsoleCaptureSuppressed()) return;
+```
+
+and two call sites that open the window — the logger's own console write, and the Angular adapter's
+delegation:
+
+```ts
+// src/logger/logger.ts
+if (toConsole && meetsLevel(level, consoleLevel)) {
+  withConsoleCaptureSuppressed(() => { writer.write(level, message, args); });
+}
+```
+
+**Why the counter lives on the shared state rather than in the wrapper.** The adapter entries are
+separate bundles that inline their own copy of everything ([§7.1](#71-the-dual-copy-symbolforlogvault1-guard)),
+so the Angular entry has its *own* `consoleCapture.ts` and cannot see a module-scoped flag in the core
+entry's copy. Both copies do resolve the same `globalThis[Symbol.for('logvault@1')]` object, so a
+counter there is visible across the seam. A counter rather than a boolean because the two sites nest.
+This is also why the helper is exported from `core/state.ts` and not from `src/index.ts`: it is
+internal plumbing, and every byte of it added to the `/angular` entry has to be justified.
+
+Two related details fall out of the same fix:
+
+- **A captured console call is persisted without the console echo.** `emit` takes an internal
+  `toConsole` flag, and the capture callback passes `false`. The application's own call already printed
+  the line; printing it again through the writer produced the duplicate, and re-entering `emit` for it
+  was only prevented by the `busy` ordering above — an accident rather than an invariant.
+- **Nothing is silenced.** Suppression skips persistence only. The original `console.warn` /
+  `console.error` still runs with the caller's `this`, which is what keeps DevTools formatting and the
+  framework's own output unchanged.
 
 ### 7.4 The rate limiter
 

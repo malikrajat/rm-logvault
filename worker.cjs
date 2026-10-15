@@ -596,6 +596,7 @@ function createState() {
     errorTracker: null,
     preInitErrors: [],
     captureSuppressed: false,
+    consoleCaptureSuppressed: 0,
     eventEmitter: null
   };
 }
@@ -604,6 +605,7 @@ function repairState(state) {
   if (mutable.errorTracker === void 0) mutable.errorTracker = null;
   if (!Array.isArray(mutable.preInitErrors)) mutable.preInitErrors = [];
   if (typeof mutable.captureSuppressed !== "boolean") mutable.captureSuppressed = false;
+  if (typeof mutable.consoleCaptureSuppressed !== "number") mutable.consoleCaptureSuppressed = 0;
   if (mutable.eventEmitter === void 0) mutable.eventEmitter = null;
   return state;
 }
@@ -630,6 +632,29 @@ function getState() {
   }
   cached = fresh;
   return cached;
+}
+function isConsoleCaptureSuppressed() {
+  try {
+    return getState().consoleCaptureSuppressed > 0;
+  } catch {
+    return false;
+  }
+}
+function withConsoleCaptureSuppressed(fn) {
+  try {
+    getState().consoleCaptureSuppressed += 1;
+  } catch {
+    return fn();
+  }
+  try {
+    return fn();
+  } finally {
+    try {
+      const state = getState();
+      state.consoleCaptureSuppressed = Math.max(0, state.consoleCaptureSuppressed - 1);
+    } catch {
+    }
+  }
 }
 
 // src/core/page.ts
@@ -682,7 +707,7 @@ function installConsoleCapture(options) {
         Reflect.apply(target, this ?? consoleObject, args);
       } catch {
       }
-      if (ingesting) return;
+      if (ingesting || isConsoleCaptureSuppressed()) return;
       ingesting = true;
       try {
         options.onCall(level, args);
@@ -895,7 +920,7 @@ function createLogger() {
     if (route !== "unknown") record.route = sanitizer.text(route, 300);
     return record;
   };
-  const emit = (level, rawMessage, args) => {
+  const emit = (level, rawMessage, args, toConsole = true) => {
     try {
       if (!enabled) return;
       if (busy) return;
@@ -913,8 +938,10 @@ function createLogger() {
           const record = buildRecord(level, message, args);
           registry.write(record);
         }
-        if (meetsLevel(level, consoleLevel)) {
-          writer.write(level, message, args);
+        if (toConsole && meetsLevel(level, consoleLevel)) {
+          withConsoleCaptureSuppressed(() => {
+            writer.write(level, message, args);
+          });
         }
       } finally {
         busy = false;
@@ -982,7 +1009,7 @@ function createLogger() {
             const first = args[0];
             const message = typeof first === "string" ? first : "[console]";
             const rest = typeof first === "string" ? args.slice(1) : args;
-            emit(level, message, rest);
+            emit(level, message, rest, false);
           }
         });
         return;
