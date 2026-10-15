@@ -9,6 +9,14 @@ import { E as ErrorContext } from './types--hrpBzU7.cjs';
  * subclass that reports and then delegates to `console.error`, exactly as the
  * default implementation does — the framework's own diagnostics stay intact.
  *
+ * That delegation is the library's own console output, not an application log call,
+ * so it runs inside `withConsoleCaptureSuppressed` (from `src/core/state.ts`, which
+ * this entry already inlines). Without it, a project using both documented options —
+ * `provideTelemetryErrorHandler()` and `logs: { captureConsole: true }` — stored every
+ * handler failure twice: once as an `ErrorRecord` in the errors database and once as
+ * a `[console]` `LogRecord` in the logs database. Fixed in 1.0.2; see
+ * [docs/ERRORS-VS-LOGS.md](../../docs/ERRORS-VS-LOGS.md).
+ *
  * The provider uses `useFactory` rather than `useClass` deliberately. A `useClass`
  * provider for a class carrying constructor parameters requires Angular DI
  * metadata, which in turn requires `experimentalDecorators` +
@@ -41,7 +49,14 @@ declare class TelemetryErrorHandler implements ErrorHandler {
      * @param context - optional context merged into every captured record
      */
     constructor(context?: ErrorContext);
-    /** Report the error, then preserve Angular's default console output. */
+    /**
+     * Report the error, then preserve Angular's default console output.
+     *
+     * @remarks
+     * The console delegation is muted for capture on purpose: the failure is already
+     * in the errors store, and `logs.captureConsole` must not turn the framework's own
+     * console line into a second, `[console]` log record. The line itself still prints.
+     */
     handleError(error: unknown): void;
 }
 /**

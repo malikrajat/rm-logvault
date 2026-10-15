@@ -4,38 +4,62 @@ var core = require('@angular/core');
 
 // src/adapters/angular.ts
 
-// src/core/env.ts
-function getGlobal(key) {
-  try {
-    return globalThis[key];
-  } catch {
-    return void 0;
-  }
-}
-function safeGet(target, key) {
-  if (target === null || typeof target !== "object" && typeof target !== "function") {
-    return void 0;
-  }
-  try {
-    return target[key];
-  } catch {
-    return void 0;
-  }
-}
-function getWindow() {
-  const w = getGlobal("window");
-  if (w === null || typeof w !== "object") return void 0;
-  return w;
-}
-function now() {
-  return Date.now();
-}
-function getLocationHref() {
-  const w = getWindow();
-  if (w === void 0) return void 0;
-  const loc = safeGet(w, "location");
-  const href = safeGet(loc, "href");
-  return typeof href === "string" ? href : void 0;
+// src/errors/constants.ts
+var REDACTED = "[REDACTED]";
+var SINGLETON_KEY = /* @__PURE__ */ Symbol.for("logvault@1");
+var RESERVED_LOG_PREFIXES = [
+  "[ErrorTracking]",
+  "[LogTracking]",
+  "[Telemetry]",
+  "[DiagnosticsExport]"
+];
+var SENSITIVE_KEY_PATTERN = /(authorization|cookie|token|password|passwd|pwd|secret|apikey|accesskey|privatekey|credential|session|signature|bearer|otp|^auth$|email|phone)/;
+var JWT_PATTERN = /\beyJ[\w-]{5,}\.[\w-]{5,}\.[\w-]*/g;
+var AUTH_SCHEME_PATTERN = /\b(Bearer|Basic|Token)\s+[\w.~+/=-]{6,}/gi;
+var EMAIL_PATTERN = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
+var KV_SECRET_PATTERNS = [
+  /((?:token|access_token|refresh_token|id_token)["']?\s*[=:]\s*["']?)([^\s&"',;]+)/gi,
+  /((?:password|pwd|secret|client_secret)["']?\s*[=:]\s*["']?)([^\s&"',;]+)/gi,
+  /((?:api_key|api-key|apikey|session|sessionid)["']?\s*[=:]\s*["']?)([^\s&"',;]+)/gi,
+  // `phone` is in SENSITIVE_KEY_PATTERN, so free text has to honour it too —
+  // otherwise `phone=+1415…` in a log message would survive while the same value
+  // under a `phone` object key would not.
+  /((?:phone|mobile|msisdn|telephone|email)["']?\s*[=:]\s*["']?)([^\s&"',;]+)/gi
+];
+var STACK_QUERY_PATTERN = /\?[^\s:)]*(?=:\d+(?::\d+)?)/g;
+var LONG_SECRET_TEXT_PATTERN = /(^|[^\w-])([\w-]{32,200})(?=[^\w-]|$)/g;
+var CHUNK_ERROR_PATTERN = /(Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|Loading chunk [\w-]+ failed|ChunkLoadError|Unable to preload CSS|Failed to load module script)/i;
+var LONG_SECRET_PATTERN = /^[\w-]{32,}$/;
+var HARD_TEXT_CAP = 2e4;
+var MAX_DEPTH = 4;
+var MAX_KEYS = 30;
+var MAX_ARRAY_ITEMS = 20;
+var MAX_STRING_LENGTH = 2e3;
+var MAX_MESSAGE_LENGTH = 1e3;
+var MAX_STACK_LENGTH = 8e3;
+var MAX_CAUSE_DEPTH = 3;
+var MAX_AGGREGATE_ERRORS = 5;
+var MAX_LOG_ARGS = 5;
+var PRE_INIT_ERROR_BUFFER_SIZE = 50;
+var MAX_LOG_MESSAGE_LENGTH = 1e3;
+var MAX_ROUTE_LENGTH = 300;
+var MAX_URL_LENGTH = 2e3;
+var MAX_ALLOWED_QUERY_VALUE_LENGTH = 100;
+var DEFAULT_ALLOWED_QUERY_PARAMS = [
+  "limit",
+  "offset",
+  "page",
+  "pageSize",
+  "size",
+  "sort",
+  "order",
+  "scope",
+  "lng",
+  "lang",
+  "type"
+];
+function truncationSuffix(dropped) {
+  return `\u2026[truncated ${String(dropped)}]`;
 }
 
 // src/core/ids.ts
@@ -95,62 +119,191 @@ function newPageLoadId() {
   return newId();
 }
 
-// src/errors/constants.ts
-var REDACTED = "[REDACTED]";
-var SINGLETON_KEY = /* @__PURE__ */ Symbol.for("logvault@1");
-var RESERVED_LOG_PREFIXES = [
-  "[ErrorTracking]",
-  "[LogTracking]",
-  "[Telemetry]",
-  "[DiagnosticsExport]"
-];
-var SENSITIVE_KEY_PATTERN = /(authorization|cookie|token|password|passwd|pwd|secret|apikey|accesskey|privatekey|credential|session|signature|bearer|otp|^auth$|email|phone)/;
-var JWT_PATTERN = /\beyJ[\w-]{5,}\.[\w-]{5,}\.[\w-]*/g;
-var AUTH_SCHEME_PATTERN = /\b(Bearer|Basic|Token)\s+[\w.~+/=-]{6,}/gi;
-var EMAIL_PATTERN = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
-var KV_SECRET_PATTERNS = [
-  /((?:token|access_token|refresh_token|id_token)["']?\s*[=:]\s*["']?)([^\s&"',;]+)/gi,
-  /((?:password|pwd|secret|client_secret)["']?\s*[=:]\s*["']?)([^\s&"',;]+)/gi,
-  /((?:api_key|api-key|apikey|session|sessionid)["']?\s*[=:]\s*["']?)([^\s&"',;]+)/gi,
-  // `phone` is in SENSITIVE_KEY_PATTERN, so free text has to honour it too —
-  // otherwise `phone=+1415…` in a log message would survive while the same value
-  // under a `phone` object key would not.
-  /((?:phone|mobile|msisdn|telephone|email)["']?\s*[=:]\s*["']?)([^\s&"',;]+)/gi
-];
-var STACK_QUERY_PATTERN = /\?[^\s:)]*(?=:\d+(?::\d+)?)/g;
-var LONG_SECRET_TEXT_PATTERN = /(^|[^\w-])([\w-]{32,200})(?=[^\w-]|$)/g;
-var CHUNK_ERROR_PATTERN = /(Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|Loading chunk [\w-]+ failed|ChunkLoadError|Unable to preload CSS|Failed to load module script)/i;
-var LONG_SECRET_PATTERN = /^[\w-]{32,}$/;
-var HARD_TEXT_CAP = 2e4;
-var MAX_DEPTH = 4;
-var MAX_KEYS = 30;
-var MAX_ARRAY_ITEMS = 20;
-var MAX_STRING_LENGTH = 2e3;
-var MAX_MESSAGE_LENGTH = 1e3;
-var MAX_STACK_LENGTH = 8e3;
-var MAX_CAUSE_DEPTH = 3;
-var MAX_AGGREGATE_ERRORS = 5;
-var MAX_LOG_ARGS = 5;
-var PRE_INIT_ERROR_BUFFER_SIZE = 50;
-var MAX_LOG_MESSAGE_LENGTH = 1e3;
-var MAX_ROUTE_LENGTH = 300;
-var MAX_URL_LENGTH = 2e3;
-var MAX_ALLOWED_QUERY_VALUE_LENGTH = 100;
-var DEFAULT_ALLOWED_QUERY_PARAMS = [
-  "limit",
-  "offset",
-  "page",
-  "pageSize",
-  "size",
-  "sort",
-  "order",
-  "scope",
-  "lng",
-  "lang",
-  "type"
-];
-function truncationSuffix(dropped) {
-  return `\u2026[truncated ${String(dropped)}]`;
+// src/core/state.ts
+function createCleanupRegistry() {
+  const teardowns = [];
+  let ran = false;
+  const run = () => {
+    if (ran) return;
+    ran = true;
+    for (let index = teardowns.length - 1; index >= 0; index -= 1) {
+      const teardown = teardowns[index];
+      if (teardown === void 0) continue;
+      try {
+        teardown();
+      } catch {
+      }
+    }
+    teardowns.length = 0;
+  };
+  return {
+    add: (teardown) => {
+      if (ran) {
+        try {
+          teardown();
+        } catch {
+        }
+        return;
+      }
+      teardowns.push(teardown);
+    },
+    addListener: (target, type, handler, options) => {
+      try {
+        target.addEventListener(type, handler, options);
+      } catch {
+        return;
+      }
+      const capture = typeof options === "object" ? options.capture === true : options === true;
+      teardowns.push(() => {
+        try {
+          target.removeEventListener(type, handler, capture);
+        } catch {
+        }
+      });
+    },
+    setTimeout: (handler, ms) => {
+      const id = setTimeout(() => {
+        try {
+          handler();
+        } catch {
+        }
+      }, ms);
+      teardowns.push(() => {
+        clearTimeout(id);
+      });
+      return id;
+    },
+    setInterval: (handler, ms) => {
+      const id = setInterval(() => {
+        try {
+          handler();
+        } catch {
+        }
+      }, ms);
+      teardowns.push(() => {
+        clearInterval(id);
+      });
+      return id;
+    },
+    run,
+    get ran() {
+      return ran;
+    }
+  };
+}
+function isTelemetryState(value) {
+  return value !== null && typeof value === "object" && value.__logvaultState === true;
+}
+function createState() {
+  return {
+    __logvaultState: true,
+    initialized: false,
+    options: null,
+    repository: null,
+    storageState: "disabled",
+    pendingErrors: 0,
+    pendingLogs: 0,
+    pageLoadId: newPageLoadId(),
+    teardown: null,
+    flush: null,
+    retryFailed: null,
+    cleanup: createCleanupRegistry(),
+    errorTracker: null,
+    preInitErrors: [],
+    captureSuppressed: false,
+    consoleCaptureSuppressed: 0,
+    eventEmitter: null
+  };
+}
+function repairState(state) {
+  const mutable = state;
+  if (mutable.errorTracker === void 0) mutable.errorTracker = null;
+  if (!Array.isArray(mutable.preInitErrors)) mutable.preInitErrors = [];
+  if (typeof mutable.captureSuppressed !== "boolean") mutable.captureSuppressed = false;
+  if (typeof mutable.consoleCaptureSuppressed !== "number") mutable.consoleCaptureSuppressed = 0;
+  if (mutable.eventEmitter === void 0) mutable.eventEmitter = null;
+  return state;
+}
+var cached;
+function getState() {
+  if (cached !== void 0) return cached;
+  try {
+    const existing = Reflect.get(globalThis, SINGLETON_KEY);
+    if (isTelemetryState(existing)) {
+      cached = repairState(existing);
+      return cached;
+    }
+  } catch {
+  }
+  const fresh = createState();
+  try {
+    Object.defineProperty(globalThis, SINGLETON_KEY, {
+      value: fresh,
+      writable: false,
+      enumerable: false,
+      configurable: false
+    });
+  } catch {
+  }
+  cached = fresh;
+  return cached;
+}
+function isConsoleCaptureSuppressed() {
+  try {
+    return getState().consoleCaptureSuppressed > 0;
+  } catch {
+    return false;
+  }
+}
+function withConsoleCaptureSuppressed(fn) {
+  try {
+    getState().consoleCaptureSuppressed += 1;
+  } catch {
+    return fn();
+  }
+  try {
+    return fn();
+  } finally {
+    try {
+      const state = getState();
+      state.consoleCaptureSuppressed = Math.max(0, state.consoleCaptureSuppressed - 1);
+    } catch {
+    }
+  }
+}
+
+// src/core/env.ts
+function getGlobal(key) {
+  try {
+    return globalThis[key];
+  } catch {
+    return void 0;
+  }
+}
+function safeGet(target, key) {
+  if (target === null || typeof target !== "object" && typeof target !== "function") {
+    return void 0;
+  }
+  try {
+    return target[key];
+  } catch {
+    return void 0;
+  }
+}
+function getWindow() {
+  const w = getGlobal("window");
+  if (w === null || typeof w !== "object") return void 0;
+  return w;
+}
+function now() {
+  return Date.now();
+}
+function getLocationHref() {
+  const w = getWindow();
+  if (w === void 0) return void 0;
+  const loc = safeGet(w, "location");
+  const href = safeGet(loc, "href");
+  return typeof href === "string" ? href : void 0;
 }
 
 // src/errors/sanitize.ts
@@ -508,134 +661,6 @@ function getDefaultSanitizer() {
   return activeSanitizer;
 }
 
-// src/core/state.ts
-function createCleanupRegistry() {
-  const teardowns = [];
-  let ran = false;
-  const run = () => {
-    if (ran) return;
-    ran = true;
-    for (let index = teardowns.length - 1; index >= 0; index -= 1) {
-      const teardown = teardowns[index];
-      if (teardown === void 0) continue;
-      try {
-        teardown();
-      } catch {
-      }
-    }
-    teardowns.length = 0;
-  };
-  return {
-    add: (teardown) => {
-      if (ran) {
-        try {
-          teardown();
-        } catch {
-        }
-        return;
-      }
-      teardowns.push(teardown);
-    },
-    addListener: (target, type, handler, options) => {
-      try {
-        target.addEventListener(type, handler, options);
-      } catch {
-        return;
-      }
-      const capture = typeof options === "object" ? options.capture === true : options === true;
-      teardowns.push(() => {
-        try {
-          target.removeEventListener(type, handler, capture);
-        } catch {
-        }
-      });
-    },
-    setTimeout: (handler, ms) => {
-      const id = setTimeout(() => {
-        try {
-          handler();
-        } catch {
-        }
-      }, ms);
-      teardowns.push(() => {
-        clearTimeout(id);
-      });
-      return id;
-    },
-    setInterval: (handler, ms) => {
-      const id = setInterval(() => {
-        try {
-          handler();
-        } catch {
-        }
-      }, ms);
-      teardowns.push(() => {
-        clearInterval(id);
-      });
-      return id;
-    },
-    run,
-    get ran() {
-      return ran;
-    }
-  };
-}
-function isTelemetryState(value) {
-  return value !== null && typeof value === "object" && value.__logvaultState === true;
-}
-function createState() {
-  return {
-    __logvaultState: true,
-    initialized: false,
-    options: null,
-    repository: null,
-    storageState: "disabled",
-    pendingErrors: 0,
-    pendingLogs: 0,
-    pageLoadId: newPageLoadId(),
-    teardown: null,
-    flush: null,
-    retryFailed: null,
-    cleanup: createCleanupRegistry(),
-    errorTracker: null,
-    preInitErrors: [],
-    captureSuppressed: false,
-    eventEmitter: null
-  };
-}
-function repairState(state) {
-  const mutable = state;
-  if (mutable.errorTracker === void 0) mutable.errorTracker = null;
-  if (!Array.isArray(mutable.preInitErrors)) mutable.preInitErrors = [];
-  if (typeof mutable.captureSuppressed !== "boolean") mutable.captureSuppressed = false;
-  if (mutable.eventEmitter === void 0) mutable.eventEmitter = null;
-  return state;
-}
-var cached;
-function getState() {
-  if (cached !== void 0) return cached;
-  try {
-    const existing = Reflect.get(globalThis, SINGLETON_KEY);
-    if (isTelemetryState(existing)) {
-      cached = repairState(existing);
-      return cached;
-    }
-  } catch {
-  }
-  const fresh = createState();
-  try {
-    Object.defineProperty(globalThis, SINGLETON_KEY, {
-      value: fresh,
-      writable: false,
-      enumerable: false,
-      configurable: false
-    });
-  } catch {
-  }
-  cached = fresh;
-  return cached;
-}
-
 // src/core/page.ts
 function currentRoute() {
   try {
@@ -686,7 +711,7 @@ function installConsoleCapture(options) {
         Reflect.apply(target, this ?? consoleObject, args);
       } catch {
       }
-      if (ingesting) return;
+      if (ingesting || isConsoleCaptureSuppressed()) return;
       ingesting = true;
       try {
         options.onCall(level, args);
@@ -899,7 +924,7 @@ function createLogger() {
     if (route !== "unknown") record.route = sanitizer.text(route, 300);
     return record;
   };
-  const emit = (level, rawMessage, args) => {
+  const emit = (level, rawMessage, args, toConsole = true) => {
     try {
       if (!enabled) return;
       if (busy) return;
@@ -917,8 +942,10 @@ function createLogger() {
           const record = buildRecord(level, message, args);
           registry.write(record);
         }
-        if (meetsLevel(level, consoleLevel)) {
-          writer.write(level, message, args);
+        if (toConsole && meetsLevel(level, consoleLevel)) {
+          withConsoleCaptureSuppressed(() => {
+            writer.write(level, message, args);
+          });
         }
       } finally {
         busy = false;
@@ -986,7 +1013,7 @@ function createLogger() {
             const first = args[0];
             const message = typeof first === "string" ? first : "[console]";
             const rest = typeof first === "string" ? args.slice(1) : args;
-            emit(level, message, rest);
+            emit(level, message, rest, false);
           }
         });
         return;
@@ -1351,20 +1378,29 @@ var TelemetryErrorHandler = class {
   constructor(context) {
     this.context = context;
   }
-  /** Report the error, then preserve Angular's default console output. */
+  /**
+   * Report the error, then preserve Angular's default console output.
+   *
+   * @remarks
+   * The console delegation is muted for capture on purpose: the failure is already
+   * in the errors store, and `logs.captureConsole` must not turn the framework's own
+   * console line into a second, `[console]` log record. The line itself still prints.
+   */
   handleError(error) {
     try {
       captureError(error, { source: "angular", ...this.context ?? {} });
     } catch {
     }
-    try {
-      const consoleObject = Reflect.get(globalThis, "console");
-      const target = consoleObject !== null && typeof consoleObject === "object" ? Reflect.get(consoleObject, "error") : void 0;
-      if (typeof target === "function") {
-        Reflect.apply(target, consoleObject, [error]);
+    withConsoleCaptureSuppressed(() => {
+      try {
+        const consoleObject = Reflect.get(globalThis, "console");
+        const target = consoleObject !== null && typeof consoleObject === "object" ? Reflect.get(consoleObject, "error") : void 0;
+        if (typeof target === "function") {
+          Reflect.apply(target, consoleObject, [error]);
+        }
+      } catch {
       }
-    } catch {
-    }
+    });
   }
 };
 function provideTelemetryErrorHandler(context) {

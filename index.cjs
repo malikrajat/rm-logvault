@@ -869,6 +869,7 @@ function createState() {
     errorTracker: null,
     preInitErrors: [],
     captureSuppressed: false,
+    consoleCaptureSuppressed: 0,
     eventEmitter: null
   };
 }
@@ -877,6 +878,7 @@ function repairState(state) {
   if (mutable.errorTracker === void 0) mutable.errorTracker = null;
   if (!Array.isArray(mutable.preInitErrors)) mutable.preInitErrors = [];
   if (typeof mutable.captureSuppressed !== "boolean") mutable.captureSuppressed = false;
+  if (typeof mutable.consoleCaptureSuppressed !== "number") mutable.consoleCaptureSuppressed = 0;
   if (mutable.eventEmitter === void 0) mutable.eventEmitter = null;
   return state;
 }
@@ -918,8 +920,33 @@ function resetState() {
   state.cleanup = createCleanupRegistry();
   state.errorTracker = null;
   state.captureSuppressed = false;
+  state.consoleCaptureSuppressed = 0;
   state.eventEmitter = null;
   state.preInitErrors.length = 0;
+  state.consoleCaptureSuppressed = 0;
+}
+function isConsoleCaptureSuppressed() {
+  try {
+    return getState().consoleCaptureSuppressed > 0;
+  } catch {
+    return false;
+  }
+}
+function withConsoleCaptureSuppressed(fn) {
+  try {
+    getState().consoleCaptureSuppressed += 1;
+  } catch {
+    return fn();
+  }
+  try {
+    return fn();
+  } finally {
+    try {
+      const state = getState();
+      state.consoleCaptureSuppressed = Math.max(0, state.consoleCaptureSuppressed - 1);
+    } catch {
+    }
+  }
 }
 
 // src/core/page.ts
@@ -1000,7 +1027,7 @@ function installConsoleCapture(options) {
         Reflect.apply(target, this ?? consoleObject, args);
       } catch {
       }
-      if (ingesting) return;
+      if (ingesting || isConsoleCaptureSuppressed()) return;
       ingesting = true;
       try {
         options.onCall(level, args);
@@ -1219,7 +1246,7 @@ function createLogger() {
     if (route !== "unknown") record.route = sanitizer.text(route, 300);
     return record;
   };
-  const emit = (level, rawMessage, args) => {
+  const emit = (level, rawMessage, args, toConsole = true) => {
     try {
       if (!enabled) return;
       if (busy) return;
@@ -1237,8 +1264,10 @@ function createLogger() {
           const record = buildRecord(level, message, args);
           registry.write(record);
         }
-        if (meetsLevel(level, consoleLevel)) {
-          writer.write(level, message, args);
+        if (toConsole && meetsLevel(level, consoleLevel)) {
+          withConsoleCaptureSuppressed(() => {
+            writer.write(level, message, args);
+          });
         }
       } finally {
         busy = false;
@@ -1306,7 +1335,7 @@ function createLogger() {
             const first = args[0];
             const message = typeof first === "string" ? first : "[console]";
             const rest = typeof first === "string" ? args.slice(1) : args;
-            emit(level, message, rest);
+            emit(level, message, rest, false);
           }
         });
         return;
@@ -3655,16 +3684,29 @@ background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14
 .meta div{min-width:0}
 .meta dt{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em;margin:0}
 .meta dd{margin:2px 0 0;word-break:break-word;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px}
-.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:20px 0 8px;
-position:sticky;top:0;background:var(--bg);padding:8px 0;border-bottom:1px solid var(--line);z-index:2}
+.bar{position:sticky;top:0;background:var(--bg);padding:8px 0;border-bottom:1px solid var(--line);
+z-index:3;margin:20px 0 8px}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 input[type=search],select{background:var(--bg);color:var(--fg);border:1px solid var(--line);
 border-radius:6px;padding:6px 8px;font:inherit;min-width:180px}
+.build{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px}
+.build select{min-width:130px}
+button{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px;
+padding:6px 10px;font:inherit;cursor:pointer}
+button:hover:enabled{border-color:var(--accent);color:var(--accent)}
+button:disabled{opacity:.45;cursor:default}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px}
+.chip{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--accent);color:var(--accent);
+border-radius:999px;padding:1px 2px 1px 9px;font-size:12px}
+.chip button{border:0;background:none;color:inherit;padding:0 5px;font-size:14px;line-height:1.2}
+.tag.click{cursor:pointer}
+.tag.click:hover{border-color:var(--accent);color:var(--accent)}
 .count{color:var(--muted);font-size:12px;margin-left:auto}
 table{width:100%;border-collapse:collapse;table-layout:fixed}
 th,td{text-align:left;vertical-align:top;padding:7px 8px;border-bottom:1px solid var(--line);
 word-break:break-word;overflow-wrap:anywhere}
 th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em;
-position:sticky;top:52px;background:var(--bg)}
+position:sticky;top:var(--bar,52px);background:var(--bg)}
 tr.row{cursor:pointer}
 tr.row:hover{background:var(--card)}
 .sev{font-weight:600}
@@ -3687,7 +3729,8 @@ tr.sel{background:var(--card);box-shadow:inset 2px 0 0 var(--accent)}
 .drill h4{margin:14px 0 6px}
 .drill .meta{background:var(--bg);margin-top:0}
 tr.near{background:rgba(26,95,180,.10)}
-@media print{body{padding:0}.controls{display:none}th{position:static}
+@media print{body{padding:0}.controls{display:none}.build{display:none}.bar{position:static;
+margin:0 0 8px}button{display:none}th{position:static;top:0}
 tr.row{cursor:auto}pre{max-height:none}.banner{border-color:#999}}
 `;
 var VIEWER_SCRIPT = `
@@ -3749,13 +3792,18 @@ var VIEWER_SCRIPT = `
     host.appendChild(fragment);
   }
 
-  function tagsCell(tags) {
+  /**
+   * A cell of click-to-filter facts: an error's tags ('@'-prefixed, since they
+   * are per-capture) or a log's environment block (named fields).
+   */
+  function pillsCell(values, prefix) {
     var cell = el('td');
-    if (tags && typeof tags === 'object') {
-      var keys = Object.keys(tags);
+    if (values && typeof values === 'object') {
+      var keys = Object.keys(values);
       if (keys.length === 0) { cell.textContent = '\\u2014'; return cell; }
       for (var i = 0; i < keys.length; i += 1) {
-        cell.appendChild(el('span', 'tag', keys[i] + '=' + str(tags[keys[i]])));
+        var text = str(values[keys[i]]);
+        cell.appendChild(facetPill(keys[i] + '=' + text, prefix + keys[i], text));
       }
       return cell;
     }
@@ -3870,12 +3918,25 @@ var VIEWER_SCRIPT = `
     return row;
   }
 
+  /** Every tag key and value on one record, flattened for the search box. */
+  function tagsText(record) {
+    var tags = record.tags;
+    if (!tags || typeof tags !== 'object') { return ''; }
+    var out = [];
+    var keys = Object.keys(tags);
+    for (var i = 0; i < keys.length; i += 1) {
+      out.push(keys[i] + ' ' + str(tags[keys[i]]));
+    }
+    return out.join(' ');
+  }
+
   function matchesSearch(record, term) {
     if (!term) { return true; }
     var haystack = [
       str(record.message), str(record.name), str(record.source), str(record.category),
       str(record.fingerprint), str(record.api && record.api.url), loadIdOf(record),
-      routeOf(record)
+      routeOf(record), facetOf(record, 'appName'), facetOf(record, 'appVersion'),
+      facetOf(record, 'buildId'), facetOf(record, 'environment'), tagsText(record)
     ].join(' ').toLowerCase();
     return haystack.indexOf(term) !== -1;
   }
@@ -3884,14 +3945,270 @@ var VIEWER_SCRIPT = `
     return loadFilter === '' || loadIdOf(record) === loadFilter;
   }
 
+  // ---------------------------------------------------------------------------
+  // Faceted filters, for the common case of several applications sharing one
+  // origin and therefore one vault. The fields are the identity the library
+  // already stamps onto every record, so the filter needs no configuration.
+  //
+  // Each entry is [field, label, scope]: scope 0 is both kinds of record, 1 is
+  // errors only, 2 is logs only. A filter never empties a table it does not
+  // describe, so "severity is error" leaves the log table alone.
+  // ---------------------------------------------------------------------------
+  var FIELDS = [
+    ['appName', 'App name', 0],
+    ['appVersion', 'App version', 0],
+    ['buildId', 'Build', 0],
+    ['environment', 'Environment', 0],
+    ['route', 'Route', 0],
+    ['pageLoadId', 'Page load', 0],
+    ['severity', 'Severity', 1],
+    ['source', 'Source', 1],
+    ['category', 'Category', 1],
+    ['name', 'Error name', 1],
+    ['uploadStatus', 'Upload status', 1],
+    ['platform', 'Platform', 1],
+    ['level', 'Log level', 2]
+  ];
+  var ENV_KEYS = { appName: 1, appVersion: 1, buildId: 1, environment: 1, platform: 1 };
+  var active = [];
+  var facetSig = '';
+
+  function fieldDef(key) {
+    for (var i = 0; i < FIELDS.length; i += 1) {
+      if (FIELDS[i][0] === key) { return FIELDS[i]; }
+    }
+    // A tag is a dynamic field: one per key, present only when a capture used it.
+    return key.charAt(0) === '@' ? [key, 'Tag ' + key.slice(1), 1] : null;
+  }
+
+  /** The value one record carries for one field; '' when it carries none. */
+  function facetOf(record, key) {
+    if (key === 'route') { return routeOf(record); }
+    if (key === 'pageLoadId') { return loadIdOf(record); }
+    var value;
+    if (key.charAt(0) === '@') {
+      var tags = record.tags;
+      value = tags && typeof tags === 'object' ? tags[key.slice(1)] : undefined;
+    } else if (ENV_KEYS[key]) {
+      var environment = record.environment;
+      value = environment && typeof environment === 'object' ? environment[key] : undefined;
+    } else {
+      value = record[key];
+    }
+    return value === undefined || value === null ? '' : String(value);
+  }
+
+  function inScope(key, isLog) {
+    var def = fieldDef(key);
+    if (!def) { return true; }
+    return def[2] === 0 || (def[2] === 2) === !!isLog;
+  }
+
+  /** Every active filter must match; a filter is skipped for a record kind that
+   *  does not carry its field. */
+  function matchesFilters(record, isLog) {
+    for (var i = 0; i < active.length; i += 1) {
+      var filter = active[i];
+      if (!inScope(filter.field, isLog)) { continue; }
+      var equal = facetOf(record, filter.field) === filter.value;
+      if (filter.op === 'not' ? equal : !equal) { return false; }
+    }
+    return true;
+  }
+
+  /**
+   * The one predicate both tables apply, so a count can never disagree with the
+   * rows underneath it. A severity is an error field and a level is a log field,
+   * so each is ignored for the kind of record that does not carry it.
+   */
+  function survives(record, isLog, term, severity, level) {
+    if (!matchesFilters(record, isLog)) { return false; }
+    if (severity && !isLog && str(record.severity) !== severity) { return false; }
+    if (level && isLog && str(record.level) !== level) { return false; }
+    return matchesSearch(record, term);
+  }
+
+  function addFilter(field, op, value) {
+    if (!field) { return; }
+    for (var i = 0; i < active.length; i += 1) {
+      if (active[i].field === field && active[i].op === op && active[i].value === value) { return; }
+    }
+    active.push({ field: field, op: op, value: value });
+    commitFilters();
+  }
+
+  /** Take a filter back out by identity, so a chip's closure stays valid. */
+  function removeFilter(removed) {
+    var kept = [];
+    for (var i = 0; i < active.length; i += 1) {
+      if (active[i] !== removed) { kept.push(active[i]); }
+    }
+    active = kept;
+    commitFilters();
+  }
+
+  function clearFilters() {
+    active = [];
+    commitFilters();
+  }
+
+  function resetAll() {
+    active = [];
+    var ids = ['search', 'severity', 'level'];
+    for (var i = 0; i < ids.length; i += 1) {
+      var node = document.getElementById(ids[i]);
+      if (node) { node.value = ''; }
+    }
+    commitFilters();
+  }
+
+  function commitFilters() {
+    renderChips();
+    update();
+  }
+
+  /** One clickable fact: choosing a value is quicker and safer than typing it. */
+  function facetPill(label, field, value) {
+    var pill = el('span', 'tag click', label);
+    pill.title = 'Filter the report to ' + label;
+    pill.addEventListener('click', function (event) {
+      if (event && typeof event.stopPropagation === 'function') { event.stopPropagation(); }
+      addFilter(field, 'is', value);
+    });
+    return pill;
+  }
+
+  function renderChips() {
+    var host = document.getElementById('chips');
+    if (!host) { return; }
+    while (host.firstChild) { host.removeChild(host.firstChild); }
+    if (active.length === 0) {
+      host.appendChild(el('span', 'sub', 'No filters. Choose a field and a value to narrow ' +
+        'this report to one application, version or module.'));
+      return;
+    }
+    for (var i = 0; i < active.length; i += 1) {
+      (function (filter) {
+        var def = fieldDef(filter.field);
+        var chip = el('span', 'chip');
+        chip.appendChild(el('span', null, (def ? def[1] : filter.field) + ' ' +
+          (filter.op === 'not' ? 'is not' : 'is') + ' ' +
+          (filter.value === '' ? '(none)' : filter.value)));
+        var remove = el('button', null, '\\u00d7');
+        remove.type = 'button';
+        remove.title = 'Remove this filter';
+        remove.addEventListener('click', function () { removeFilter(filter); });
+        chip.appendChild(remove);
+        host.appendChild(chip);
+      })(active[i]);
+    }
+    host.appendChild(el('span', 'sub', active.length + ' active'));
+    var clear = el('button', null, 'Clear all');
+    clear.type = 'button';
+    clear.id = 'clearFilters';
+    clear.addEventListener('click', clearFilters);
+    host.appendChild(clear);
+  }
+
+  /** Populate the field list once, adding one dynamic field per tag key. */
+  function buildFacetOptions(select) {
+    var seen = {};
+    var list = FIELDS.slice();
+    for (var i = 0; i < errors.length; i += 1) {
+      var tags = errors[i].tags;
+      if (!tags || typeof tags !== 'object') { continue; }
+      var keys = Object.keys(tags);
+      for (var j = 0; j < keys.length; j += 1) {
+        var field = '@' + keys[j];
+        // The '@' prefix keeps a tag key such as 'constructor' off Object.prototype.
+        if (seen[field]) { continue; }
+        seen[field] = 1;
+        list.push([field, 'Tag ' + keys[j], 1]);
+      }
+    }
+    for (i = 0; i < list.length; i += 1) {
+      var option = document.createElement('option');
+      option.value = list[i][0];
+      option.textContent = list[i][1] +
+        (list[i][2] === 1 ? ' (errors)' : list[i][2] === 2 ? ' (logs)' : '');
+      select.appendChild(option);
+    }
+  }
+
+  /**
+   * Fill the value list from the records that survive the active filters, so no
+   * offered value is a dead end. '' is the real '(none)' bucket, which is how
+   * records captured before appName was configured are reached.
+   */
+  function refreshValues(force) {
+    var facet = document.getElementById('facet');
+    var values = document.getElementById('facetValue');
+    if (!facet || !values) { return; }
+    if (facet.options.length === 0) { buildFacetOptions(facet); }
+    var key = facet.value;
+    var signature = key + '|' + JSON.stringify(active);
+    if (!force && signature === facetSig) { return; }
+    facetSig = signature;
+
+    // null when the list was empty, so a first render does not jump to the
+    // '(none)' bucket just because that is what an empty select reports.
+    var previous = values.firstChild ? values.value : null;
+    while (values.firstChild) { values.removeChild(values.firstChild); }
+
+    var items = [];
+    function tally(value) {
+      for (var i = 0; i < items.length; i += 1) {
+        if (items[i][0] === value) { items[i][1] += 1; return; }
+      }
+      items.push([value, 1]);
+    }
+    var i;
+    if (inScope(key, false)) {
+      for (i = 0; i < errors.length; i += 1) {
+        if (matchesFilters(errors[i], false)) { tally(facetOf(errors[i], key)); }
+      }
+    }
+    if (inScope(key, true)) {
+      for (i = 0; i < logs.length; i += 1) {
+        if (matchesFilters(logs[i], true)) { tally(facetOf(logs[i], key)); }
+      }
+    }
+    items.sort(function (a, b) { return a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0; });
+
+    if (items.length === 0) {
+      var empty = document.createElement('option');
+      empty.value = '';
+      empty.textContent = '(nothing left to filter)';
+      values.appendChild(empty);
+      return;
+    }
+    for (i = 0; i < items.length; i += 1) {
+      var option = document.createElement('option');
+      option.value = items[i][0];
+      option.textContent = (items[i][0] === '' ? '(none)' : items[i][0]) + ' (' + items[i][1] + ')';
+      values.appendChild(option);
+      if (items[i][0] === previous) { values.value = previous; }
+    }
+  }
+
+  /** Keep the sticky table header under a bar whose height depends on wrapping. */
+  function syncBarOffset() {
+    var bar = document.getElementById('bar');
+    var root = document.documentElement;
+    if (!bar || !root || !root.style || typeof root.style.setProperty !== 'function') { return; }
+    var height = bar.offsetHeight;
+    if (typeof height === 'number' && height > 0) {
+      root.style.setProperty('--bar', height + 'px');
+    }
+  }
+
   function groupByFingerprint(term, severity) {
     var groups = [];
     var seen = {};
     for (var i = 0; i < errors.length; i += 1) {
       var record = errors[i];
       if (!inLoad(record)) { continue; }
-      if (severity && str(record.severity) !== severity) { continue; }
-      if (!matchesSearch(record, term)) { continue; }
+      if (!survives(record, false, term, severity, '')) { continue; }
       var key = str(record.fingerprint) || str(record.id);
       var group = seen[key];
       if (!group) {
@@ -3934,7 +4251,7 @@ var VIEWER_SCRIPT = `
       messageCell.appendChild(rawDetails(group.records.length === 1 ? record : group.records));
       row.appendChild(messageCell);
 
-      row.appendChild(tagsCell(record.tags));
+      row.appendChild(pillsCell(record.tags, '@'));
       row.addEventListener('click', (function (id) {
         return function () { selectError(id); };
       })(record.id));
@@ -3956,8 +4273,7 @@ var VIEWER_SCRIPT = `
     for (var i = 0; i < logs.length; i += 1) {
       var record = logs[i];
       if (!inLoad(record)) { continue; }
-      if (level && str(record.level) !== level) { continue; }
-      if (!matchesSearch(record, term)) { continue; }
+      if (!survives(record, true, term, '', level)) { continue; }
       shown += 1;
 
       var row = el('tr', 'row');
@@ -3973,7 +4289,7 @@ var VIEWER_SCRIPT = `
       messageCell.appendChild(rawDetails(record));
       row.appendChild(messageCell);
 
-      row.appendChild(tagsCell(record.environment));
+      row.appendChild(pillsCell(record.environment, ''));
       body.appendChild(row);
     }
     if (shown === 0) {
@@ -4011,22 +4327,37 @@ var VIEWER_SCRIPT = `
     }
   }
 
-  function renderLoads(term) {
+  function renderLoads(term, severity, level) {
     var body = document.getElementById('loads-body');
     if (!body) { return 0; }
     while (body.firstChild) { body.removeChild(body.firstChild); }
     var shown = 0;
     for (var i = 0; i < loads.length; i += 1) {
       var load = loads[i];
-      if (term && (load.id + ' ' + load.route).toLowerCase().indexOf(term) === -1) { continue; }
+      // The counts describe what the tables below currently hold, not what the
+      // load once held: a number that disagrees with its own table is worse than
+      // no number. A load with nothing left is not listed at all, because it
+      // would only offer the reader an empty table. The search term needs no
+      // separate test against the load id, because matchesSearch already reads
+      // the page-load id and the route off every record.
+      var errorRows = 0;
+      var logRows = 0;
+      var j;
+      for (j = 0; j < load.errors.length; j += 1) {
+        if (survives(load.errors[j], false, term, severity, level)) { errorRows += 1; }
+      }
+      for (j = 0; j < load.logs.length; j += 1) {
+        if (survives(load.logs[j], true, term, severity, level)) { logRows += 1; }
+      }
+      if (errorRows + logRows === 0) { continue; }
       shown += 1;
       var row = el('tr', 'row' + (load.id === loadFilter ? ' sel' : ''));
       row.appendChild(el('td', 'mono', shortId(load.id)));
       row.appendChild(el('td', null, load.route || '\u2014'));
       row.appendChild(el('td', 'mono', timeText(load.first)));
       row.appendChild(el('td', null, durationText(load.first, load.last) || '\u2014'));
-      row.appendChild(el('td', null, String(load.errors.length)));
-      row.appendChild(el('td', null, String(load.logs.length)));
+      row.appendChild(el('td', null, String(errorRows)));
+      row.appendChild(el('td', null, String(logRows)));
       row.addEventListener('click', (function (id) {
         return function () { focusLoad(id); };
       })(load.id));
@@ -4035,7 +4366,7 @@ var VIEWER_SCRIPT = `
     if (shown === 0) {
       body.appendChild(emptyRow(6, loads.length === 0
         ? 'No records were captured in this report.'
-        : 'No page loads match the current search.'));
+        : 'No page loads match the current filters.'));
     }
     return shown;
   }
@@ -4081,6 +4412,23 @@ var VIEWER_SCRIPT = `
       }
     }
     host.appendChild(metaList(rows));
+
+    // One click from a record to the vault narrowed to whatever it belongs to.
+    var quick = el('div', 'chips');
+    var quickKeys = ['appName', 'appVersion', 'buildId', 'environment', 'source', 'category',
+      'route'];
+    var quickCount = 0;
+    for (var q = 0; q < quickKeys.length; q += 1) {
+      var quickValue = facetOf(record, quickKeys[q]);
+      if (quickValue !== '') {
+        quick.appendChild(facetPill(quickKeys[q] + '=' + quickValue, quickKeys[q], quickValue));
+        quickCount += 1;
+      }
+    }
+    if (quickCount > 0) {
+      host.appendChild(el('h4', 'sub', 'Filter the report to'));
+      host.appendChild(quick);
+    }
 
     function block(title, text) {
       if (!text) { return; }
@@ -4136,10 +4484,12 @@ var VIEWER_SCRIPT = `
     var sev = severity ? String(severity.value || '') : '';
     var lvl = level ? String(level.value || '') : '';
 
+    refreshValues(false);
     var groupsShown = renderErrors(term, sev);
     var logsShown = renderLogs(term, lvl);
-    var loadsShown = renderLoads(term);
+    var loadsShown = renderLoads(term, sev, lvl);
     renderDrill();
+    syncBarOffset();
 
     var errorCount = document.getElementById('errors-count');
     if (errorCount) {
@@ -4157,7 +4507,35 @@ var VIEWER_SCRIPT = `
   if (severitySelect) { severitySelect.addEventListener('change', update); }
   var levelSelect = document.getElementById('level');
   if (levelSelect) { levelSelect.addEventListener('change', update); }
+  var resetButton = document.getElementById('reset');
+  if (resetButton) { resetButton.addEventListener('click', resetAll); }
+  var facetSelect = document.getElementById('facet');
+  if (facetSelect) {
+    // Rebuilding the value list is what makes the second dropdown a list of
+    // values that exist rather than a text box that invites a typo.
+    facetSelect.addEventListener('change', function () { refreshValues(true); });
+  }
+  var addButton = document.getElementById('addFilter');
+  if (addButton) {
+    addButton.addEventListener('click', function () {
+      var facet = document.getElementById('facet');
+      var op = document.getElementById('op');
+      var values = document.getElementById('facetValue');
+      if (!facet || !op || !values || facet.value === '') { return; }
+      addFilter(facet.value, op.value === 'not' ? 'not' : 'is', values.value);
+    });
+  }
+  var onlyThisApp = document.getElementById('onlyThisApp');
+  if (onlyThisApp) {
+    var thisApp = str(payload.app && payload.app.appName);
+    onlyThisApp.disabled = thisApp === '';
+    onlyThisApp.addEventListener('click', function () {
+      if (thisApp !== '') { addFilter('appName', 'is', thisApp); }
+    });
+  }
+  window.addEventListener('resize', syncBarOffset);
 
+  renderChips();
   renderMeta();
   update();
 })();
@@ -4192,17 +4570,32 @@ function renderDiagnosticsReport(meta, errors, logs, encodedPayload) {
 
 <dl class="meta" id="meta"></dl>
 
+<div class="bar" id="bar">
 <div class="controls">
 <label for="search" class="sub">Search</label>
-<input type="search" id="search" placeholder="message, name, source, url, load id" autocomplete="off">
+<input type="search" id="search" placeholder="message, name, app, route, tag, load id" autocomplete="off">
 <label for="severity" class="sub">Severity</label>
 <select id="severity">${severityMarkup}</select>
 <label for="level" class="sub">Level</label>
 <select id="level">${levelMarkup}</select>
+<button type="button" id="reset">Reset all</button>
+</div>
+<div class="build">
+<label for="facet" class="sub">Filter by</label>
+<select id="facet" aria-label="Field to filter on"></select>
+<select id="op" aria-label="Comparison">
+<option value="is">is</option>
+<option value="not">is not</option>
+</select>
+<select id="facetValue" aria-label="Value to match"></select>
+<button type="button" id="addFilter">Add filter</button>
+<button type="button" id="onlyThisApp">Only this app</button>
+</div>
+<div class="chips" id="chips"></div>
 </div>
 
 <h2>Page loads <span class="sub" id="loads-count">0 of 0</span></h2>
-<p class="sub">Select a load to filter the errors and the logs down to it; select it again to clear.</p>
+<p class="sub">Select a load to filter the errors and the logs down to it; select it again to clear. The error and log counts follow the filters above, so a load with nothing left is not listed.</p>
 <table>
 <thead><tr><th style="width:13%">Load</th><th style="width:20%">Route</th><th style="width:18%">First event</th><th style="width:11%">Span</th><th style="width:9%">Errors</th><th style="width:9%">Logs</th></tr></thead>
 <tbody id="loads-body"></tbody>

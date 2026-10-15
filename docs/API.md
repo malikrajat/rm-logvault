@@ -1110,6 +1110,11 @@ occurrences **aggregate** into one pending row; a `LogRecord` carries `level`, `
 `seq`, and every call is its own appended row. Use `captureError` when you want grouping, severity and
 the diagnostics report's fingerprint view; use `logger.error` when you want a message-shaped event.
 
+> **For one event, call exactly one of them.** Calling `captureError` *and* `logger.error` (or
+> `console.error` with `logs.captureConsole`) for the same failure writes one row in each database,
+> which reads as duplication in the report. The rule, every API on either side of the split and the
+> three ways the pattern arises are in [ERRORS-VS-LOGS.md](ERRORS-VS-LOGS.md).
+
 | Member       | Signature                                            | Description                                                                                                                                                      |
 |--------------|------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `trace`      | `(message: string, ...args: LogArgs) => void`        | Lowest level.                                                                                                                                                    |
@@ -1350,7 +1355,11 @@ the write is queued **immediately** — error records are not batched, unlike lo
 50 accumulate or `logs.writeFlushMs` (default 1000 ms) elapses. `flushTelemetry()` awaits that queue and
 is the deterministic way to know a record has been handed to storage. A write that fails is reported
 under the `error-persist` stage. `ctx.source` defaults to `'manual'`; see [`logger`](#logger) for why a
-`logger.error(...)` never appears in the errors store.
+`logger.error(...)` never appears in the errors store, and
+[ERRORS-VS-LOGS.md](ERRORS-VS-LOGS.md) for the complete map of which call writes which database. Every
+other error API — `captureApiError`, `captureFetchError`, `withErrorCapture`, `withChunkCapture`,
+`attachWorker` and the framework adapters — funnels into this function rather than writing storage
+itself.
 
 ```ts
 import { captureError } from '@codewithrajat/rm-logvault';
@@ -2702,6 +2711,71 @@ interface ReportMeta {
   readonly logCount: number;
 }
 ```
+
+#### The embedded viewer
+
+The report is one file: the records live in a `<script type="application/json">` element, and an inline
+ES5 program reads them and builds the page. It never uses `innerHTML` or any other string-to-markup sink,
+and the embedded CSP (`default-src 'none'`) means it cannot fetch anything — so a message containing markup
+renders as those literal characters, and the file works from `file://` with no network.
+
+**Filters.** Four controls narrow all four tables at once:
+
+| Control | What it matches |
+| --- | --- |
+| **Search** | Message, name, source, category, fingerprint, request URL, route, page-load id, tag keys and values, and the application identity (`appName`, `appVersion`, `buildId`, `environment`). Case-insensitive substring. |
+| **Severity** | `fatal`, `error`, `warning` or `info` on error rows. |
+| **Level** | `error`, `warn`, `info`, `debug` or `trace` on log rows. |
+| **Filter by** | The field-and-value builder described below. |
+| **Reset all** | Clears the search box, both dropdowns and every filter. |
+
+**The filter builder** exists because one origin means one vault. A parent site and its sub-apps, a host
+page and its embedded widgets, and every microfrontend on a domain all write into the same
+`${dbPrefix}-errors` and `${dbPrefix}-logs` stores — IndexedDB is scoped to an origin, so the library
+cannot and should not separate them. A report from such a deployment therefore mixes every application's
+rows, and the builder is how a reader gets to their own.
+
+- **Field.** The stable fields are the identity the library stamps onto every record — `App name`,
+  `App version`, `Build`, `Environment` — plus `Route`, `Page load`, `Source`, `Severity`, `Category`,
+  `Error name`, `Upload status`, `Platform` and `Log level`. One further field appears for **every tag key
+  found in the records**, labelled `Tag <key>`, so anything passed through `captureError(err, { tags })` is
+  filterable without configuration.
+- **Comparison.** `is` or `is not`. The negative form is how a reader excludes another team's module
+  instead of selecting their own.
+- **Value.** Auto-filled from the values that moments ago were in the payload, each with the number of
+  records carrying it, and **cascaded**: the list reflects the filters already applied, so a value that
+  cannot match anything is never offered. Records that carry no value for the field are collected into a
+  `(none)` entry, which is how a report reaches rows captured before `appName` was configured. Values are
+  sorted, and the list is rebuilt in the DOM — never concatenated into markup — which is why a malicious
+  record value cannot become an element.
+- **Active filters** appear as chips. Each chip has a `×` that removes that one filter, and `Clear all`
+  removes the set.
+
+Two rules make the result trustworthy rather than merely narrow:
+
+1. **A filter is skipped for a record kind that does not carry its field.** `Severity` and `Level` are the
+   examples: `severity is error` narrows the errors table and leaves the logs untouched, because a log has
+   no severity. Reporting the log table as filtered down to nothing would look like data loss.
+2. **No offered value is a dead end**, because of the cascade. The one case where nothing is left is stated
+   in the dropdown rather than shown as an empty list.
+
+**One-click filters.** Because typing or scrolling to a value is the slow part, the identity is also
+clickable wherever it appears:
+
+- the **Environment** column of the log table, whose pills are `appName=…`, `appVersion=…`, `buildId=…` and
+  `environment=…`;
+- the **Tags** column of the error table, whose pills are `key=value` for each tag on the record;
+- the **drill-down panel** for a selected error, which lists every identity and classification the record
+  carries as a pill;
+- the **Only this app** button, which adds `App name is <meta.appName>` in one press.
+
+Clicking a pill restores the filter it describes; clicking it on an error row does not disturb the row's
+own drill-down selection.
+
+> **Source note:** the viewer applies its filters in the browser, to a report that already contains every
+> record. It is a reading aid, not a way to produce a smaller file. To keep a vault per application
+> instead, give each one a different `dbPrefix` — the trade is that a single report can then no longer
+> describe both, and nothing is migrated between the two.
 
 ### `sanitizeErrorRecord`
 

@@ -1445,6 +1445,10 @@ declare function createSinkRegistry(): SinkRegistry;
  * 3. **Re-entrancy is blocked, not just discouraged.** A sink that logs, or a
  *    wrapped `console.warn` called from inside our own writer, is dropped rather
  *    than recursed into.
+ * 4. **The library's own console output is never a log record.** A captured
+ *    `console.warn`/`console.error` call is persisted *without* the console echo (the
+ *    application already printed it), and the writer itself runs inside
+ *    `withConsoleCaptureSuppressed`.
  *
  * @packageDocumentation
  */
@@ -3841,6 +3845,23 @@ interface TelemetryState {
     preInitErrors: BufferedError[];
     /** Whether capture is globally suppressed (`enabled: false`). Shared by every copy. */
     captureSuppressed: boolean;
+    /**
+     * Nesting depth of console writes the library is making on its own behalf.
+     *
+     * @remarks
+     * While this is above zero, the opt-in `console.warn`/`console.error` wrapper still
+     * prints — nothing is silenced — but it does not persist the call as a log record.
+     * Two sites set it: the logger's own console writer (so a captured console call is
+     * not echoed into a second record) and the Angular adapter's deliberate delegation
+     * to `console.error` (so one Angular failure is one error record, not an error
+     * record *and* a log record). A counter rather than a boolean, because those two
+     * nest.
+     *
+     * It lives on the shared state for the same reason the error tracker does: the
+     * adapter entries are separate bundles that inline their own copy of the pipeline,
+     * so a module-scoped flag would be invisible to the wrapper the core installed.
+     */
+    consoleCaptureSuppressed: number;
     /**
      * The observer emitter for the current installation, or `null`.
      *

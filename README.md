@@ -84,6 +84,7 @@
 - [**Configuration**](#configuration) - Every option, default and environment variable.
 - [**Options cheatsheet**](docs/OPTIONS-CHEATSHEET.md) - Every option with its real default inline, and six presets.
 - [**API Reference**](docs/API.md) - Every exported symbol, with signatures and examples.
+- [**Errors vs. logs**](docs/ERRORS-VS-LOGS.md) - Which call writes which database, and the one rule that keeps them apart.
 - [**REST Contract**](docs/REST-CONTRACT.md) - The wire format, status codes and server obligations.
 - [**Architecture**](docs/ARCHITECTURE.md) - The capture pipeline and the diagnostics-export path.
 - [**Security**](docs/SECURITY.md) - Threat model, the redaction design and the egress guarantee.
@@ -305,7 +306,7 @@ That is the entire install. Nothing else is pulled in, and no install script run
 ```html
 <!-- index.html — put this near the end of <body> -->
 <script type="module">
-  import { initTelemetry, logger } from 'https://esm.sh/@codewithrajat/rm-logvault@1.0.1';
+  import { initTelemetry, logger } from 'https://esm.sh/@codewithrajat/rm-logvault@1.0.2';
 
   initTelemetry({ appName: 'marketing-site' });
   logger.warn('[Hero] fallback image used');
@@ -333,7 +334,7 @@ Use this when there is no build step at all.
 ```html
 <!-- index.html — the single page you already have -->
 <script type="module">
-  import { initTelemetry } from 'https://esm.sh/@codewithrajat/rm-logvault@1.0.1';
+  import { initTelemetry } from 'https://esm.sh/@codewithrajat/rm-logvault@1.0.2';
 
   initTelemetry({ appName: 'static-site' });
 </script>
@@ -501,6 +502,13 @@ The ladder is `trace < debug < info < warn < error`. Higher wins. Each call take
 number of extra values, which are stored alongside it (`logger.error(msg, error)` is the common
 shape).
 
+> **`logger` writes the logs database, and only the logs database.** Every level does, `error`
+> included — it is a log *level*, not error capture, and a real `Error` passed as an argument changes
+> nothing. For a row in the errors database use [`captureError`](#capturing-an-error-yourself)
+> instead, and **not both for the same failure**: two APIs for one event means one row in each
+> database, which reads as a duplicate. The rule, and every API on either side of it, is
+> [docs/ERRORS-VS-LOGS.md](docs/ERRORS-VS-LOGS.md).
+
 ##### "I set the level and nothing was saved"
 
 This confuses almost everybody, so here it is plainly. **There are two independent levels.**
@@ -558,9 +566,22 @@ initTelemetry({ appName: 'my-app', logs: { captureConsole: true, level: 'warn' }
 Every existing `console.warn(...)` and `console.error(...)` call keeps printing as before and is now
 also captured. `destroyTelemetry()` restores the original methods.
 
+Three things this does **not** do, all of which have been reported as bugs:
+
+- It captures `console.warn` and `console.error` only. `console.log` and `console.info` are never
+  captured.
+- It writes **log** records. A captured `console.error(...)` goes to `rm-logvault-logs`, never to
+  `rm-logvault-errors`; use `captureError` for that.
+- It never captures the library's own console output — the line a framework adapter prints after
+  reporting, for instance, prints but is not stored. Before 1.0.2 the Angular adapter's delegation was
+  stored as a `[console]` log record as well as the error record, which is the "same entry in both
+  databases" report.
+
 ##### Sending logs somewhere else as well (sinks)
 
-A "sink" is a function that receives each log record that passes the persist level.
+A "sink" is a function that receives every log call the logger accepts — at any level, including ones
+below `logs.level`, because the persist threshold belongs to the library's own IndexedDB sink rather
+than to the dispatch.
 
 ```ts
 // src/main.ts
@@ -592,6 +613,11 @@ try {
   throw error; // re-throw if you still want your normal handling to run
 }
 ```
+
+> **`captureError` writes the errors database, and it is the only call you need.** Adding a
+> `logger.error(...)` or a `console.error(...)` next to it does not reinforce the record — it files the
+> same failure a second time, in the logs database. Pick one; if you genuinely want both, see
+> [when two records is legitimate](docs/ERRORS-VS-LOGS.md#6-when-two-records-for-one-event-is-legitimate).
 
 `captureError` accepts literally anything you can throw — a string, `null`, a hostile object, an
 `AggregateError`, an object with a circular `cause` chain. It never throws, so it is safe inside a
@@ -752,6 +778,13 @@ install and no server.
 | `rm-logvault-logs`   | `logs`       | One row per saved log call.                                            |
 
 The `rm-logvault` part comes from the `dbPrefix` option; change it and both names change.
+
+**The two databases are written by two different sets of calls, and one event belongs in one of them.**
+`captureError` writes `rm-logvault-errors`; `logger.*` and opt-in console capture write
+`rm-logvault-logs`. Calling an error API *and* a logging API for the same failure puts a row in each,
+which is the most common "why is this entry in both databases" report. The full classification — every
+API, the `source` or `level` each produces, and the three ways the pattern arises — is
+[docs/ERRORS-VS-LOGS.md](docs/ERRORS-VS-LOGS.md).
 
 **To look at them in Chrome, Edge or Brave:**
 
@@ -1212,6 +1245,46 @@ instance and share one set of listeners instead of double-capturing. `initTeleme
 a second call from HMR, a duplicate bundle or a careless component installs nothing new — and each
 remote can call `destroyTelemetry()` in its own teardown without disturbing the host.
 
+### Do a site and its subdomain share one database?
+
+**No — and that is the browser's rule, not a setting.** IndexedDB is keyed to an **origin**, which is
+scheme + host + port. `https://example.com` and `https://admin.example.com` are two origins, so each keeps
+its own `rm-logvault-errors` and `rm-logvault-logs`, and no API can read across them. `www.example.com`,
+`http://` vs `https://`, and a different port are all different origins for the same reason.
+`http://localhost:3000` and `http://localhost:4200` are two vaults, which is the usual reason a dev report
+looks empty.
+
+The other half of the answer is the one that bites. **A parent site and its sub-apps on the same host share
+one vault** — `/` and `/admin`, a microfrontend on the host page, a same-origin iframe, and every tab of
+that origin all write to the same stores. That is intended: it is what lets one downloaded file describe a
+whole incident. So when several applications share an origin, a report mixes their rows, and the report's
+viewer filters them apart:
+
+- **Filter by** `App name`, `App version`, `Build` or `Environment` — the identity `initTelemetry` stamps
+  onto every record — or by `Route`, `Source`, `Severity`, `Category` and any tag key you passed through
+  `captureError(err, { tags })`.
+- The value dropdown is filled from the report's own values and narrowed by the filters already applied, so
+  every value on offer matches something and nothing has to be typed.
+- **Only this app** narrows the whole report to the reporting app in one press, and the `appName=…` pills in
+  the log table do the same from any row.
+
+```ts
+// The parent site and the module it hosts both do this, with different names.
+initTelemetry({ appName: 'parent-site', appVersion: '4.2.0', environment: 'production' });
+initTelemetry({ appName: 'billing-module', appVersion: '1.8.3', environment: 'production' });
+```
+
+If you would rather isolate them outright, give each one its own `dbPrefix`:
+
+```ts
+initTelemetry({ appName: 'billing-module', dbPrefix: 'billing-blackbox' });
+// now billing-blackbox-errors, and a report from the parent no longer contains it
+```
+
+The trade is explicit: separate vaults cannot be covered by one report, and nothing is migrated between
+them. See [docs/BROWSER-SUPPORT.md](docs/BROWSER-SUPPORT.md#24-one-origin-is-one-vault-subdomains-do-not-share-paths-do)
+and [docs/API.md](docs/API.md#the-embedded-viewer).
+
 ### What about GDPR and the right to erasure?
 
 Three primitives cover it. Gate capture with `consent` (re-evaluated before every capture, save and
@@ -1371,22 +1444,25 @@ minified and gzipped, by `scripts/measure-size.mjs`:
 | `logger` only                    | 6.08 kB    |
 | `sanitizeValue` only             | 6.09 kB    |
 | `captureError` only              | 7.43 kB    |
-| `exportDiagnosticsReport` only   | 15.25 kB   |
+| `exportDiagnosticsReport` only   | 19.29 kB   |
 | `@codewithrajat/rm-logvault/testing`               | 4.68 kB    |
 | `@codewithrajat/rm-logvault/http`                  | 7.61 kB    |
 | `@codewithrajat/rm-logvault/storage`               | 6.22 kB    |
-| `@codewithrajat/rm-logvault/react`                 | 6.90 kB    |
+| `@codewithrajat/rm-logvault/react`                 | 6.91 kB    |
 | `@codewithrajat/rm-logvault/axios`                 | 7.71 kB    |
 | `@codewithrajat/rm-logvault/fetch`                 | 8.17 kB    |
 | `@codewithrajat/rm-logvault/worker`                | 7.35 kB    |
-| `initTelemetry` (the full recorder) | 33.34 kB |
-| `initTelemetry` + `logger`       | 33.36 kB   |
-| `events` + context builders      | 34.72 kB   |
-| whole barrel, `dist/index.js`    | 37.91 kB   |
+| `initTelemetry` (the full recorder) | 37.39 kB |
+| `initTelemetry` + `logger`       | 37.41 kB   |
+| `events` + context builders      | 38.78 kB   |
+| whole barrel, `dist/index.js`    | 42.06 kB   |
+
+`exportDiagnosticsReport` alone costs more than `initTelemetry` minus the global handlers, because the
+self-contained report carries its whole viewer as a string literal and a string cannot be minified.
 
 Framework adapters are separate subpaths and **no framework is ever bundled** — React, Vue, Angular,
 axios and TanStack Query all stay external, provided by your app. `worker`, `http` and `storage` are
-subpaths with no peer at all. The regression budget is 39 kB, enforced in CI, so an
+subpaths with no peer at all. The regression budget is 43 kB, enforced in CI, so an
 accidentally-bundled dependency fails the build.
 
 Reproduce the table with `pnpm run size:consumers` (after `pnpm run build`). The whole-barrel figure
@@ -1510,7 +1586,7 @@ which itself defaults to true when you supply `rest.errorsUrl`, `rest.logsUrl` o
 | `maxLogsPerMinute` | `number \| undefined`                                   | `600`       | Rate limit for log persistence.                                                                 |
 | `writeFlushMs`     | `number \| undefined`                                   | `1000`      | Upper bound in ms on how long a buffered log waits before being written.                        |
 | `writeBatchSize`   | `number \| undefined`                                   | `50`        | Buffered entries that trigger an immediate write; also the transaction batch size.               |
-| `captureConsole`   | `boolean \| undefined`                                  | `false`     | Wrap `console.warn` and `console.error` so existing calls are captured too.                     |
+| `captureConsole`   | `boolean \| undefined`                                  | `false`     | Wrap `console.warn` and `console.error` so existing calls are captured too — into the **logs** store; the library's own console output is never stored. |
 | `beforeStore`      | `(record: LogRecord) => LogRecord \| null \| undefined` | `undefined` | Last chance to inspect, change or drop a log record before it is saved.                         |
 
 ### `redaction.*`
@@ -1795,8 +1871,9 @@ declarations for every subpath. No `@types` package needed.
 | CSP blocks the upload                         | `connect-src` does not include the endpoint origin                                                                    | Add the origin to `connect-src` — a missing directive falls back to `default-src`                                                |
 | Records are stuck in `failed`                 | A terminal status (`400`, `401`, `403`, `404`, `405`, `410`, `413`, `415`, `422`) marked the whole batch              | Inspect `onTerminalFailure`'s arguments, fix the cause, then call `retryFailedTelemetry()`                                      |
 | The same error appears twice                  | At-least-once delivery after a lost 2xx, or two separate copies of the library in different module realms             | Key your server on the record `id`; check for a duplicate bundled copy                                                          |
+| The same entry is in **both** databases       | One failure filed by two APIs — `captureError` *and* `logger.error`, or `console.error` with `captureConsole: true`     | Call one of them: `captureError` writes `rm-logvault-errors`, `logger.*` writes `rm-logvault-logs`. See [docs/ERRORS-VS-LOGS.md](docs/ERRORS-VS-LOGS.md) |
 | Errors thrown before `initTelemetry` are missing | The 50-entry pre-init buffer overflowed, or `enabled: false` suppressed them                                        | Call `initTelemetry` as early as you can; the buffer keeps the oldest 50 and drops the newest overflow                          |
-| The bundle is over 39 kB                      | An adapter was imported into the main entry, or the whole package was imported for one helper                        | Import `@codewithrajat/rm-logvault/react` and friends as subpaths; run `pnpm run size`                                                             |
+| The bundle is over 43 kB                      | An adapter was imported into the main entry, or the whole package was imported for one helper                        | Import `@codewithrajat/rm-logvault/react` and friends as subpaths; run `pnpm run size`                                                             |
 | Errors from a Web Worker never appear         | A worker's `error`/`messageerror` events fire on the `Worker` object, not on `window`, so nothing is installed by default | `attachWorker(worker, { name })` from `@codewithrajat/rm-logvault/worker`                                                       |
 | An error is missing its tags or its `source`  | The same `Error` reached two paths, and the record was created by the first one                                        | Both calls now merge; the second call's `tags`/`extra` are applied, and its `source` wins only if the first had none            |
 | Errors are dropped while `droppedByRepeat` climbs | One failure is repeating past `errors.maxRepeatsPerMinute` (default 12/min), which is deliberate                     | It is already in the report; raise or disable the cap only if the repeat count itself is the signal you want                     |
@@ -1871,6 +1948,7 @@ Need assistance? We're here to help!
 - [examples/README.md](examples/README.md) — runnable code for every feature, in each of five frameworks — vanilla, React, Vue, Angular and Next.js — organised into `basic`, `advanced`, `config` and `more-advanced` tiers.
 - [React: a complete integration, in order](examples/react/START-HERE.md) — **New to the library? Start here.** A linear walkthrough — four steps, two files — from nothing to a working React setup with a real fallback UI.
 - [docs/API.md](docs/API.md) — every exported symbol, with signatures and examples.
+- [docs/ERRORS-VS-LOGS.md](docs/ERRORS-VS-LOGS.md) — which call writes which database, and how not to file one event twice.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — the capture pipeline, the diagnostics-export path, sequence diagrams and the load-bearing mechanisms.
 - [docs/CONFIGURATION.md](docs/CONFIGURATION.md) — the exhaustive option reference, precedence and presets.
 - [docs/OPTIONS-CHEATSHEET.md](docs/OPTIONS-CHEATSHEET.md) — the complete options object, every default inline, a deep dive per option and six presets.
@@ -1916,7 +1994,9 @@ Saying this plainly is more useful than a long feature list.
   record and nothing else — it never appeared in the errors store, whatever it was passed, and strings
   and numbers included. Call `captureError(error, ctx)` explicitly. `captureError` accepts any type and
   normalises internally, so `String(error)` and `JSON.stringify(error)` are never needed; use `toError`
-  when you genuinely need an `Error` object back.
+  when you genuinely need an `Error` object back. Which call writes which database — and why calling
+  both for one failure is the "duplicate entry" report — is
+  [docs/ERRORS-VS-LOGS.md](docs/ERRORS-VS-LOGS.md).
 - **No automatic worker instrumentation.** `attachWorker` is explicit. There is no registry of live
   `Worker` instances to scan, and keeping one would mean wrapping the `Worker` constructor — changing
   what your own `instanceof Worker` checks return, on every page.

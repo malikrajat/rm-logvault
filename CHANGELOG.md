@@ -1,9 +1,113 @@
 # Changelog
 
-## 1.0.1
+## 1.0.2
 
 ### Patch Changes
 
+- ## The diagnostics report can be filtered down to one application
+  
+  IndexedDB is scoped to an **origin**, so every application on one host — a parent site and its
+  sub-apps on different paths, a host page and its widgets, every microfrontend — writes into the same
+  `rm-logvault-errors` and `rm-logvault-logs` stores. That default is what lets one downloaded report
+  describe a whole incident, and it is what made the report unreadable for the person holding it: the
+  viewer could narrow by free-text search, severity, log level and page load, none of which is the
+  identity the library already stamps onto every record.
+  
+  The embedded viewer now has a **filter builder**:
+  
+  - **Filter by** a field, then choose a value from a dropdown that is **auto-filled from the report's
+    own records** — so nothing has to be typed and nothing can be misspelled. The value list is
+    cascaded against the filters already applied, counted and sorted, so every value on offer matches at
+    least one record. Records that carry no value for the field are collected into a `(none)` entry.
+  - Fields: `App name`, `App version`, `Build`, `Environment` — the identity `initTelemetry` stamps onto
+    every record — plus `Route`, `Page load`, `Source`, `Severity`, `Category`, `Error name`,
+    `Upload status`, `Platform`, `Log level`, and **one field per tag key** found in the records, so
+    anything passed through `captureError(err, { tags })` is filterable with no configuration.
+  - **`is` / `is not`**, so you can exclude another module rather than only selecting your own.
+  - Active filters appear as **removable chips**, with `Clear all` alongside them, and `Reset all`
+    clears the search box and both dropdowns as well.
+  - **One click from any row**: the log table's Environment pills (`appName=…`), the error table's tag
+    pills (`flow=checkout`) and the selected error's drill-down panel all add the filter they describe.
+    A single **Only this app** button narrows the report to `meta.appName`.
+  - A filter on a field that one kind of record does not carry is **skipped for that kind**, so
+    `severity is error` narrows the errors table and leaves the log table alone instead of reporting it
+    as filtered out. Error-only and log-only fields are labelled `(errors)` and `(logs)` in the field
+    list.
+  
+  The search box now also matches the application identity (`appName`, `appVersion`, `buildId`,
+  `environment`) and every tag key and value. The page-load table is now an honest index of the tables
+  below it: a load's error and log counts are computed with the **same predicate** those tables use —
+  facet filters, severity, level and search — so the numbers cannot disagree with the rows underneath
+  them, and a load with nothing left is no longer listed at all.
+  
+  Nothing about the export changes: it is the same single self-contained HTML file, the same embedded
+  JSON payload and the same CSP, and the filter builder reads only records that are already in it. The
+  viewer still uses `textContent` and `createElement` exclusively — the value dropdown is an empty
+  `<select>` in the static markup and is filled in the DOM, so no record value ever reaches markup as a
+  string.
+  
+  The core bundle budget moves with it, from 39 kB to **43 kB** min+gzip at a measured **42.06 kB**
+  (`size-limit`), because the viewer is a string literal that esbuild cannot minify. The reasoning, the
+  measured breakdown and the rejected alternatives are recorded in `docs/DECISIONS.md` (D-039), and
+  `docs/BROWSER-SUPPORT.md` now states the origin rules explicitly — a subdomain, a different port, or
+  `http` vs `https` is a **different** vault, so there is nothing to filter; the same origin is one
+  vault, which is what the filter is for.
+
+- ## One Angular failure is no longer stored in both databases
+  
+  `TelemetryErrorHandler.handleError` reports the failure with `captureError` and then delegates to
+  `console.error`, exactly as Angular's default handler does, so the framework's own diagnostics are
+  unchanged. With `logs: { captureConsole: true }` that delegation was **also persisted**, as a
+  `[console]` `LogRecord` in `${dbPrefix}-logs` — so a project using two documented options together
+  filed one Angular failure twice, once in each database, with no application code at fault. Each
+  option is correct on its own; only their combination was wrong.
+  
+  The delegation now runs inside an internal suppression window: it still prints, it is no longer
+  stored. The same window covers the logger's own console writer, which fixes a second defect in the
+  same feature — a captured `console.warn`/`console.error` was echoed back through that writer, so
+  `console.warn('hello')` printed `hello` **and** `[rm-logvault] hello`. A captured call is now
+  persisted without the console echo, because the application has already printed it.
+  
+  Nothing about application console output changes. The original method still runs first, with the
+  caller's `this`, DevTools formatting is untouched, and `logs.captureConsole` still stores the
+  application's own `console.warn` and `console.error` calls. The depth counter lives on the shared
+  `globalThis[Symbol.for('logvault@1')]` state rather than in the wrapper, because the adapter entries
+  are separate bundles that inline their own copy — the Angular entry could not otherwise mute the
+  wrapper the core entry installed. The core entry measures **42.16 kB** min+gzip against the unchanged
+  43 kB budget (+0.10 kB), and the `/angular` entry grows by the counter helper rather than by a whole
+  module. The reasoning, the measurement and the rejected alternatives are in `docs/DECISIONS.md`
+  (D-040).
+
+- ## Which call writes which database is now one page
+  
+  Errors and logs are two separate IndexedDB databases written by two disjoint sets of calls:
+  `captureError` — and everything that funnels into it (`captureApiError`, `captureFetchError`,
+  `withErrorCapture`, `withChunkCapture`, `attachWorker`, and every framework adapter) — writes
+  `${dbPrefix}-errors`, while `logger.*` and opt-in console capture write `${dbPrefix}-logs`. That is by
+  design, and two calls for one failure therefore produce one row in each store with the same
+  `pageLoadId`, route and timestamp. It was documented in fragments across `API.md`, `README.md` and
+  `TROUBLESHOOTING.md`, which is how it came to be reported as the library inserting the same entry
+  twice.
+  
+  `docs/ERRORS-VS-LOGS.md` now states it as a rule — **for one event, call exactly one of them** —
+  lists every API on each side of the split with the `source` or `level` it produces, names the three
+  ways the duplicate pattern arises (two APIs at one call site; `captureError` next to a captured
+  `console.error`; and the Angular case fixed above), explains why the stores are separate and when two
+  records for one event is a deliberate choice, and shows how to tell the two record kinds apart in the
+  report, in DevTools and from `getAll()`. It is linked from `README.md`, the `docs/README.md` index,
+  `API.md`, `ARCHITECTURE.md`, `llms.txt` and `llms-full.txt`, and `TROUBLESHOOTING.md` gains cases D
+  and E under *Duplicate records appear*.
+  
+  Two documentation claims were also corrected against the published tarballs: `logger.addSink`
+  receives every accepted log call rather than only those above `logs.level` (the persist threshold
+  belongs to the library's own IndexedDB sink), and a note claiming the diagnostics download could
+  never succeed — "through 1.0.2", "fixed in 1.0.3" — was wrong on both the behaviour and the version,
+  since `safeGet` has accepted function targets since 1.0.0.
+
+## 1.0.1
+
+### Patch Changes
+  
   ## `logger.error(msg, error)` has never captured an error
   
   Integration notes elsewhere describe `logger.error('[Checkout] failed', error)` as auto-capturing an

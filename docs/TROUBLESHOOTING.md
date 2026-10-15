@@ -14,7 +14,7 @@ console.log('options', getState().options);
 console.log('sync configured', isSyncConfigured(getState().options ?? resolveOptions()));
 ```
 
-`getTelemetryStatus()` alone answers several of the twelve symptoms below.
+`getTelemetryStatus()` alone answers several of the symptoms below.
 
 Another quiet-but-useful check: the library reports its own failures through `onInternalError` and
 through the console under the reserved `[Telemetry]` prefix, **once per stage per initialization**. If
@@ -343,9 +343,13 @@ runtime, an unusual embedder — makes every download return `false` with nothin
 `exportDiagnosticsReport({ format: 'json', copyToClipboard: true })` bypasses the blob path entirely:
 it works as a workaround, and it proves the read-and-render half of the pipeline is healthy.
 
-> **Source note.** Through 1.0.2 this path could never succeed at all, in any browser: `safeGet`
-> rejected function targets, so `URL.createObjectURL` always read as `undefined` and every download
-> returned `false` regardless of the environment. Fixed in 1.0.3.
+> **Source note, corrected.** An earlier revision of this page claimed that through 1.0.2 the download
+> path could never succeed, because `safeGet` rejected function targets and `URL.createObjectURL` always
+> read as `undefined`. That is not what shipped, and the claim named a version that does not exist: both
+> the 1.0.0 and the 1.0.1 tarball accept function targets in `safeGet` (`typeof target !== 'object' &&
+> typeof target !== 'function'`), so the capability check passes and the download works in every
+> published version. If a download returns `false`, the cause is one of the four checks above or the
+> storage state, not `safeGet`.
 
 If the shortcut is genuinely unsuitable (a kiosk with no keyboard, or a requirement that reports be
 produced only by a support tool), disable it and drive the export yourself:
@@ -763,7 +767,9 @@ The destination is chosen by the API you called, **not by the level**. `logger.e
 logged with `logger.error` and then opened `rm-logvault-errors`, it is empty and nothing is wrong.
 Only `captureError(...)` and the handler/adapter routes produce `ErrorRecord`s. The two kinds are not
 interchangeable — an `ErrorRecord` has a fingerprint, severity and occurrence count that aggregate
-across repeats, while a `LogRecord` is one appended row per call.
+across repeats, while a `LogRecord` is one appended row per call. The complete map of which call writes
+which database, and how to avoid filing one event twice, is
+[ERRORS-VS-LOGS.md](ERRORS-VS-LOGS.md).
 
 **B. The `logger.info` you wrote just before the `throw` was filtered on its own.** The persist
 threshold `logs.level` defaults to `'warn'`, so that statement is dropped at the sink — see
@@ -1028,9 +1034,10 @@ if (import.meta.env.DEV) {
 
 **Symptom.** The report contains two or more records with the same `fingerprint` and the same
 message. Or the server receives the same `id` more than once. Or `occurrenceCount` looks lower than
-the number of times the bug happened.
+the number of times the bug happened. Or the same failure appears in **both** databases —
+`rm-logvault-errors` and `rm-logvault-logs`.
 
-**Cause.** Three different things, and they need different answers.
+**Cause.** Five different things, and they need different answers.
 
 **A. Same `fingerprint`, different `id`.** This is correct and expected. Error aggregation merges into
 a row only while that row is `pending`. An occurrence that arrives while the row is `uploading` (it is
@@ -1048,6 +1055,27 @@ sent again. The server is required to be idempotent on `id`.
 idempotent and the shared state lives on `globalThis[Symbol.for('logvault@1')]`, so duplicate bundled
 copies merge into one. It _is_ possible across realms — two iframes, a worker, or two tabs — each of
 which has its own `globalThis` and its own installation writing to the same databases.
+
+**D. One failure, two APIs, two stores.** This is the "the same entry is inserted into both databases"
+report. Errors and logs are separate databases, and the destination is chosen by the API you called:
+`captureError` writes an `ErrorRecord` to `rm-logvault-errors`, while `logger.error` writes a
+`LogRecord` to `rm-logvault-logs`. Call both for one failure — or call `captureError` next to a
+`console.error` while `logs.captureConsole` is `true` — and you get one row in each store, with the
+same message, the same route and the same `pageLoadId`, which is indistinguishable from duplication at
+a glance. No de-duplication applies, because the two rows are not the same kind of record: they share
+neither an `id` nor a fingerprint nor a store.
+
+**E. `logs.captureConsole` captured the library's own console output (1.0.2).** On 1.0.0 and 1.0.1,
+`provideTelemetryErrorHandler()` + `logs: { captureConsole: true }` stored every Angular handler
+failure twice: `captureError` filed the `ErrorRecord`, and the adapter's deliberate delegation to
+`console.error` — which exists to preserve Angular's default diagnostics — was captured as a
+`[console]` `LogRecord`. A captured `console.warn`/`console.error` was also printed twice, once
+verbatim and once with the library's `[rm-logvault]` prefix. Both are fixed in 1.0.2; nothing is
+silenced, the library's own console lines are simply no longer stored. On 1.0.1, upgrade or set
+`logs.captureConsole: false`.
+
+The full classification — every API that writes each store, and what to call instead — is
+[ERRORS-VS-LOGS.md](ERRORS-VS-LOGS.md).
 
 **Diagnosis.**
 
@@ -1082,6 +1110,22 @@ The `status` column is the discriminator:
 - One `pending`, one `uploading`/`uploaded`/`failed` → case A. Expected.
 - The same `id` appearing twice → impossible locally (the key path is `id`), so you are reading two
   realms. Check the tab and iframe count.
+- **The rows are in different databases** → case D or E, and the snippet above cannot see it because it
+  reads `errors` only. Count both stores and compare the messages:
+
+```js
+const { getState, flushTelemetry } = await import('@codewithrajat/rm-logvault');
+
+await flushTelemetry(); // the log batch may still be in memory
+const repository = getState().repository;
+const errors = await repository.errors.getAll();
+const logs = await repository.logs.getAll();
+
+console.table(errors.ok ? errors.value.map((r) => ({ kind: 'error', message: r.message, source: r.source })) : errors);
+console.table(logs.ok ? logs.value.map((r) => ({ kind: 'log', message: r.message, level: r.level })) : logs);
+// A log row whose message is '[console]' means console capture stored an application
+// console.warn/console.error. On 1.0.0/1.0.1 it can also be the Angular adapter — case E.
+```
 
 **Fix.**
 
@@ -1108,6 +1152,24 @@ The `status` column is the discriminator:
 - **Case C: nothing to fix, but be aware.** Two tabs writing to the same databases is by design.
   Claiming is atomic, so no record is uploaded twice from two tabs, but the _report_ from tab A does
   not include tab B's unsent records. `pageLoadId` distinguishes them.
+- **Case D: stop calling two APIs for one failure.** Keep `captureError` and delete the `logger.error`
+  (or `console.error`) beside it, or keep the log call and delete the `captureError`. The
+  classification is a rule, not a preference — see [ERRORS-VS-LOGS.md](ERRORS-VS-LOGS.md):
+
+  ```ts
+  // Both rows, one event — the case D pattern.
+  captureError(error, { tags: { flow: 'checkout' } });
+  logger.error('[Checkout] submitOrder failed', error);
+
+  // One row, and the context travels with the failure.
+  captureError(error, { tags: { flow: 'checkout' }, extra: { orderId } });
+  ```
+
+  If you do want both on purpose, say so in a tag (`tags: { alsoLogged: 'true' }`) so the pair is
+  readable as deliberate rather than as a duplicate.
+- **Case E: upgrade to 1.0.2.** The `[console]` rows the Angular adapter produced are gone, and a
+  captured console call prints once. Nothing is silenced; only the persistence half of the library's
+  own console output was removed. On 1.0.1 the workaround is `logs: { captureConsole: false }`.
 - **If the duplicates are self-inflicted, stop double-capturing.** A common accidental pattern is to
   capture in a `catch` block _and_ let the error propagate to `window.onerror`. The identity map
   handles the same `Error` _object_ reaching both paths — and as of 1.0.1 the second call's `tags`,
@@ -1266,16 +1328,15 @@ The env equivalent is `ERROR_TRACKING_MAX_REPEATS_PER_MINUTE`. See
 
 ---
 
-### The bundle got bigger than 39 kB
+### The bundle got bigger than 43 kB
 
 **Symptom.** `pnpm run size` fails:
 
 ```text
   core (ESM, min+gzip)
   Package size limit has exceeded by 1.4 kB
-  Size limit:   39 kB
-  Size:         40.4 kB
-  With all deps: 40.4 kB
+  Size limit: 43 kB
+  Size:       44.4 kB with all dependencies, minified and gzipped
 ```
 
 Or your own bundle grows unexpectedly after adding logVault.
@@ -1359,14 +1420,18 @@ the third, to 37 kB at a measured 36.55 kB, including the two pieces that were m
 first, and
 [D-037](DECISIONS.md#d-037--the-bundle-budget-moves-to-39-kb-for-the-adapter-and-enrichment-work)
 records the fourth measured raise, to 39 kB at a measured 37.91 kB, for the adapter and enrichment
-work. The budget exists so that "we added a dependency" cannot happen silently, and raising it
+work, and
+[D-039](DECISIONS.md#d-039--the-bundle-budget-moves-to-43-kb-for-the-diagnostics-report-filter-builder)
+records the fifth measured raise, to 43 kB at a measured 42.06 kB, for the filter builder in the
+self-contained HTML diagnostics report. The budget exists so that "we added a dependency" cannot
+happen silently, and raising it
 should be a deliberate, reviewed act. The preferred response is almost always to move the code behind
 a subpath — which is exactly how every adapter is structured.
 
 Three practical notes:
 
 - **`size-limit` measures min+gzip**, and the core is built **unminified** (`minify: false` in
-  `tsup.config.ts`) because consumers minify. The measured 37.91 kB is therefore realistic for a
+  `tsup.config.ts`) because consumers minify. The measured 42.06 kB is therefore realistic for a
   production build, not an artefact of measuring raw source.
 - **The number is not a marketing claim, it is a CI gate.** `pnpm run verify` runs `size` last, and CI
   runs it in the build job, so an over-budget change fails the build rather than shipping.
