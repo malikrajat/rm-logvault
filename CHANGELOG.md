@@ -1,5 +1,78 @@
 # Changelog
 
+## 1.0.3
+
+### Patch Changes
+
+- ## Every option and environment variable now states what it is when you do not set it
+  
+  **No behaviour changes.** Every option, every default and every environment variable in this release
+  was already implemented; this release is the documentation that was missing. Nothing in `src/` behaves
+  differently, the resolved configuration is byte-for-byte the same, and the bundle size is unchanged at
+  42.16 kB min+gzip against the 43 kB budget.
+  
+  The gap was narrow and real: you could read what a switch *does*, but not what it *is* when you skip
+  it. A table cell that says `Default` and then a bare number does not answer the question people
+  actually ask in the middle of an incident — "I never configured this, so what am I getting right
+  now?" — and three defaults were actively misleading as a result: the shortcut is installed unless you
+  disable it, `env` is off so a `.env` file does nothing until you pass `env: true`, and `logs.level`
+  is `warn` so `logger.info` calls are not stored.
+  
+  **New: [`docs/DEFAULTS.md`](https://github.com/malikrajat/rm-logvault/blob/main/docs/DEFAULTS.md)** —
+  one page, one row per parameter, with three columns: the option, the value in force when the key is
+  absent, and what that value does in practice. It covers:
+  
+  - every option in every namespace, plus the two defaults that surprise people most (`shortcut` is
+    installed by default; `env` is off, so `initTelemetry({ appName: 'x' })` ignores a `.env` full of
+    `VITE_ERROR_TRACKING_*` variables);
+  - every environment variable, with the rule that makes the layer safe to adopt incrementally — an
+    unset variable is indistinguishable from an absent option, because the layer only ever *supplies* a
+    value and has no defaults of its own;
+  - the options that deliberately have **no** default and why a default would be a decision the library
+    must not make for you (`logs.consoleLevel`, `consent`, the `before*` hooks, `onInternalError`,
+    `getHeaders` / `onTerminalFailure`);
+  - the invalid-value rules as a table, including the cases that fall back on purpose (`0` is meaningful
+    for the rate limits and retention, rejected as a mistake for `maxRecords` and `maxPayloadBytes`);
+  - how to confirm the whole set at runtime with `resolveOptions({})`, `DEFAULT_OPTIONS` and
+    `getTelemetryStatus()`, rather than trusting a document.
+  
+  **`docs/CONFIGURATION.md` gains §13, the environment-variable reference it never had.** The
+  exhaustive option reference documented every option but none of the 25 variables that can set them;
+  that reference now has the complete table per group, the `env` opt-in, the `fromEnv` rules, the legacy
+  aliases, the parsing rules and a complete `.env` whose every value matches a built-in default.
+  
+  **One documentation defect corrected.** `LOG_LEVEL` was documented as console-only in six places.
+  It is not: it sets `logs.consoleLevel` **and** is the last fallback for `logs.level`, so a build that
+  sets only `LOG_LEVEL=debug` prints *and persists* debug lines, and `LOG_LEVEL=error` persists at
+  `error` rather than at the `warn` default. The two resolved chains are now written out explicitly in
+  every table that mentions either variable. The behaviour is unchanged — the docs were wrong, not the
+  code.
+  
+  **Environment tables now state the default-when-absent for every variable**, in `README.md`,
+  `docs/API.md`, `docs/CONFIGURATION.md`, and the `config` tier of every framework guide. Rows read
+  `none — the field is omitted from the record` instead of `none`, `500 rows` instead of `500`, and
+  `30000 ms between successful flushes` instead of `30000`. The React guide's table was also missing
+  `VITE_ERROR_TRACKING_ENABLED` and `VITE_LOG_PERSIST_MAX_PAYLOAD_BYTES`; it is now the complete set.
+  
+  **Every new page is reachable from the root `README.md`, and links back.** `docs/DEFAULTS.md` is
+  listed in the README's table of contents, introduced at the top of its `## Configuration` section,
+  referenced from the environment-variable section, and listed under Documentation — five entry points
+  in total — and it links back to `README.md` and to the `docs/` index, as the sibling documents do.
+  `docs/API.md`, `docs/CONFIGURATION.md`, `docs/OPTIONS-CHEATSHEET.md`, `docs/README.md`,
+  `examples/README.md` and the framework `config` guides all link to it as well.
+  
+  **A broken code fence in `docs/OPTIONS-CHEATSHEET.md` is fixed.** The fenced `ts` block that opens
+  the complete `TelemetryOptions` object in §1 was never closed, so on GitHub the rest of the file
+  rendered with inverted fencing: §2's prose and headings appeared inside a code block, later code
+  blocks rendered as prose, and the closing "Where to go next" links were not clickable. One missing
+  closing fence restored it. All 1247 relative links and headings across `README.md`, `docs/` and
+  `examples/` now resolve.
+  
+  `llms.txt` and `llms-full.txt` carry the same facts for assistant consumers, including the explicit
+  guarantee that an unset variable falls through to the built-in default, the corrected `LOG_LEVEL`
+  resolution, and a corrected `files:` line — it claimed `docs/` and `examples/` ship to npm, and they
+  do not.
+
 ## 1.0.2
 
 ### Patch Changes

@@ -16,6 +16,11 @@ one precise thing throughout.
 > resolved-form interfaces, and the reasoning behind each default. This file is the same surface in
 > the shape you actually type, plus the per-option detail. Where the two ever appear to disagree,
 > CONFIGURATION.md is right and this file is the bug.
+>
+> **[DEFAULTS.md](DEFAULTS.md)** answers the inverse question — "I never set this, so what is it right
+> now?" — with one row per option and per environment variable, including what the default value does
+> in practice and the five options that deliberately have no default. Start there if you are reading a
+> downloaded report and wondering why a field is missing.
 
 Every default below is quoted from `DEFAULT_OPTIONS` and `resolveOptions` in
 `src/core/config.ts`, every limit from `src/errors/constants.ts`,
@@ -146,6 +151,7 @@ initTelemetry({
   errorRetentionDays: undefined, // -> errors.retentionDays (default: 7)
   logRetentionDays: undefined, //   -> logs.retentionDays   (default: 3)
 });
+```
 
 Top-level keys, for reference: `appName`, `appVersion`, `buildId`, `environment`, `enabled`, `mode`,
 `dbPrefix`, `openTimeoutMs`, `env`, `errors`, `logs`, `redaction`, `rest`, `shortcut`, `consent`,

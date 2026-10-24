@@ -103,6 +103,7 @@ inference — the rule is "does `0` have a meaning here?". It does for `retentio
 | You want | Read |
 | --- | --- |
 | Every option, its unit, its default and its boundaries | [docs/API.md](../../../docs/API.md#every-option-annotated) |
+| What every option *is* when you do not set it, and what that value does | [docs/DEFAULTS.md](../../../docs/DEFAULTS.md) |
 | A scannable list of the options by group | [the option index](./01-options-at-a-glance.md) |
 | The environment variables, with units and legacy aliases | [environment variables](./02-environment-variables.md) |
 | Copy-pasteable presets for a whole deployment | [docs/CONFIGURATION.md](../../../docs/CONFIGURATION.md) |

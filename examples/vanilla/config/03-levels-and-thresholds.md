@@ -155,10 +155,14 @@ per-environment verbosity:
 
 | Variable | Option | Notes |
 | --- | --- | --- |
-| `VITE_LOG_LEVEL` | `logs.consoleLevel` | The console threshold. |
+| `VITE_LOG_LEVEL` | `logs.consoleLevel`, and the last fallback for `logs.level` | The console threshold. |
 | `VITE_LOG_PERSIST_LEVEL` | `logs.level` | The persist threshold; an **empty** value inherits `VITE_LOG_LEVEL`. |
 | `VITE_LOG_PERSIST_MAX_PAYLOAD_BYTES` | `logs.maxPayloadBytes` | Per record, in bytes. |
 | `VITE_ERROR_TRACKING_MAX_PAYLOAD_BYTES` | `errors.maxPayloadBytes` | Per record, in bytes. |
+
+`VITE_LOG_LEVEL` is the console threshold **and** the last candidate in the persist chain, so a build
+that sets only that one variable prints and persists at the same level. Set both when you want them to
+differ — a chatty console with quiet storage, or the reverse.
 
 ```bash
 # Development: chattier than production, in the console AND in the store

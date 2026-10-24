@@ -28,10 +28,12 @@ build.
 
 ## The variables this tier uses
 
-Suffixes are shown with `VITE_`, because that is the prefix Vite exposes. The full table, including
-every option and the aliases, is
-[../../vanilla/config/02-environment-variables.md](../../vanilla/config/02-environment-variables.md);
-this is the subset a React application normally touches, plus one thing that is specific to it.
+Suffixes are shown with `VITE_`, because that is the prefix Vite exposes. This is every variable the
+environment layer reads, annotated for a React application; the per-variable examples with a worked
+`.env.development` are in
+[../../vanilla/config/02-environment-variables.md](../../vanilla/config/02-environment-variables.md),
+and the "what if I omit it" answer for every option — including the ones with no variable — is in
+[docs/DEFAULTS.md](../../../docs/DEFAULTS.md).
 
 | Variable | Option | Unit / values | Default |
 | --- | --- | --- | --- |
@@ -46,14 +48,24 @@ this is the subset a React application normally touches, plus one thing that is 
 | `VITE_LOG_TRACKING_REST_URL` | `rest.logsUrl` | absolute `http(s)` or a path | none |
 | `VITE_TELEMETRY_SYNC_INTERVAL_MS` | `rest.intervalMs` | milliseconds | `30000` |
 | `VITE_TELEMETRY_SYNC_BATCH_SIZE` | `rest.batchSize` | records per request | `50` |
+| `VITE_ERROR_TRACKING_ENABLED` | `errors.enabled` | `true`/`false` | `true` |
 | `VITE_ERROR_TRACKING_RETENTION_DAYS` | `errors.retentionDays` | days; `0` = no age cutoff | `7` |
 | `VITE_ERROR_TRACKING_MAX_RECORDS` | `errors.maxRecords` | rows | `500` |
 | `VITE_ERROR_TRACKING_MAX_PAYLOAD_BYTES` | `errors.maxPayloadBytes` | UTF-8 bytes per record | `16384` |
 | `VITE_LOG_PERSIST_ENABLED` | `logs.enabled` | `true`/`false` | `true` |
-| `VITE_LOG_LEVEL` | `logs.consoleLevel` | level | unchanged |
+| `VITE_LOG_LEVEL` | `logs.consoleLevel`, then the last fallback for `logs.level` | level | unchanged; persist stays `warn` |
 | `VITE_LOG_PERSIST_LEVEL` | `logs.level` | level; **empty inherits `VITE_LOG_LEVEL`** | `warn` |
 | `VITE_LOG_PERSIST_RETENTION_DAYS` | `logs.retentionDays` | days | `3` |
 | `VITE_LOG_PERSIST_MAX_RECORDS` | `logs.maxRecords` | rows | `2000` |
+| `VITE_LOG_PERSIST_MAX_PAYLOAD_BYTES` | `logs.maxPayloadBytes` | UTF-8 bytes per record | `4096` |
+
+**The `Default` column is the value you get when the variable is absent.** It is not a suggested
+starting point and it is not applied by the environment layer — the layer supplies nothing when a
+variable is missing, so the option falls through to the same built-in default you would get by
+omitting it in code. That is what makes the layer safe to adopt one variable at a time: adding a
+`.env` line changes exactly that one option, and commenting it out restores exactly the default
+above. The full "what do I get if I pass nothing" table, including the options that have no variable
+at all, is [docs/DEFAULTS.md](../../../docs/DEFAULTS.md).
 
 **There is no environment variable for `context.tags`.** The adapter's `tags` and `extra` are per-call
 options on `reactRootErrorHandlers()` and `TelemetryErrorBoundary`, not part of the environment layer —

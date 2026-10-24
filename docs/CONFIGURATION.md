@@ -11,6 +11,10 @@ For the same surface as a single object to copy and edit — every option with i
 [OPTIONS-CHEATSHEET.md](OPTIONS-CHEATSHEET.md). It defers to this document wherever the two could
 differ.
 
+For the inverse question — "I did not set this, so what is it?" — see
+[DEFAULTS.md](DEFAULTS.md), which lists every option and every environment variable with the value
+that is in force when the key is absent. §13 below is the environment-variable reference.
+
 ---
 
 ## The simplest possible setup
@@ -1128,3 +1132,221 @@ test('the kiosk build never uploads', () => {
   expect(isSyncConfigured(resolveOptions({ rest: { enabled: false } }))).toBe(false);
 });
 ```
+
+---
+
+## 13. Environment variables
+
+The environment layer is a **reader, not a switch**. It contributes values to the same precedence
+chain as §1; it has no defaults of its own. So an unset variable is indistinguishable from an absent
+option, and the option keeps its built-in default.
+
+### 13.1 Turning it on
+
+Nothing is read until you opt in. This is the single most common surprise: a `.env` file full of
+`VITE_ERROR_TRACKING_*` variables does **nothing** until `env` is passed.
+
+```ts
+import { initTelemetry, fromEnv } from '@codewithrajat/rm-logvault';
+
+initTelemetry({ appName: 'checkout' }); // env is undefined → no variable is read
+initTelemetry({ env: true }); // VITE_, NEXT_PUBLIC_, REACT_APP_ — in that order
+initTelemetry({ env: 'VITE_' }); // one prefix
+initTelemetry({ env: ['VITE_', 'PUBLIC_'] }); // several, searched in order
+```
+
+`env: true` uses `DEFAULT_ENV_PREFIXES` — `['VITE_', 'NEXT_PUBLIC_', 'REACT_APP_']`. For each
+suffix, `import.meta.env` is consulted before `process.env`, and the first non-empty match wins. An
+empty string, an unparseable value or a negative number is ignored, so a typo falls through to the
+next candidate and finally to the built-in default.
+
+The core never reads `import.meta.env` on its own. That is what keeps `initTelemetry` usable in
+Node, in an SSR framework, in a Web Worker and in a bare `<script type="module">` — see
+[D-008](DECISIONS.md#d-008--env-boolean--string--string-instead-of-reading-importmetaenv-directly).
+
+`fromEnv()` is the same reader, exported, for when you want to place values yourself:
+
+```ts
+const env = fromEnv('VITE_');
+initTelemetry({
+  appName: env.appName,
+  errors: { maxRecords: env.errorsMaxRecords },
+  logs: { retentionDays: env.logsRetentionDays },
+});
+```
+
+> **Do not spread it.** `fromEnv()` returns a **flat** object (`errorsMaxRecords`, `logsRetentionDays`,
+> `errorsUrl`, …) while `resolveOptions` reads the environment only through `options.env`. Only the
+> identity fields — `appName`, `appVersion`, `buildId`, `environment` — have a top-level name that
+> coincides, so `{ ...fromEnv() }` silently drops every nested one. Use `env:` for the environment,
+> or `fromEnv()` when you are naming the fields explicitly.
+
+### 13.2 Identity and top level
+
+| Variable (suffix)          | Option          | Unit / values          | Default when absent |
+| -------------------------- | --------------- | ---------------------- | ------------------- |
+| `APP_NAME`                 | `appName`       | string                 | `undefined` — omitted |
+| `APP_VERSION`              | `appVersion`    | string                 | `undefined` — omitted |
+| `BUILD_ID`                 | `buildId`       | string                 | `undefined` — omitted |
+| `APP_ENV`, `ENVIRONMENT`   | `environment`   | string                 | `undefined` — omitted |
+| `TELEMETRY_ENABLED`        | `enabled`       | `true`/`false`         | `true`              |
+| `TELEMETRY_DB_PREFIX`      | `dbPrefix`      | string                 | `rm-logvault`       |
+| `TELEMETRY_OPEN_TIMEOUT_MS`| `openTimeoutMs` | milliseconds; integer  | `5000`              |
+
+`environment` is **not inferred** from `NODE_ENV` or `import.meta.env.MODE`. If the variable is
+absent the field is omitted from every record rather than recorded as empty.
+
+### 13.3 Errors
+
+| Variable | Option | Unit | Default when absent |
+| -------- | ------ | ---- | ------------------- |
+| `ERROR_TRACKING_ENABLED` | `errors.enabled` | boolean | `true` |
+| `ERROR_TRACKING_RETENTION_DAYS` | `errors.retentionDays` | days; `0` = no age cutoff | `7` |
+| `ERROR_TRACKING_MAX_RECORDS` | `errors.maxRecords` | rows; integer | `500` |
+| `ERROR_TRACKING_MAX_PAYLOAD_BYTES` | `errors.maxPayloadBytes` | UTF-8 bytes; integer | `16384` |
+| `ERROR_TRACKING_MAX_EVENTS_PER_MINUTE` | `errors.maxEventsPerMinute` | admissions per 60 s; `0` = off | `120` |
+| `ERROR_TRACKING_MAX_REPEATS_PER_MINUTE` | `errors.maxRepeatsPerMinute` | records per fingerprint per 60 s; `0` = off | `12` |
+
+There is no variable for `errors.allowedQueryParams`, `beforeCapture`,
+`preventDefaultUnhandledRejection`, `captureResources`, `captureCsp` or `captureChunkErrors`. Those
+stay code-only, because a mis-set boolean that changes which events are recorded is worse than an
+extra line of configuration.
+
+### 13.4 Logs
+
+| Variable | Option | Unit | Default when absent |
+| -------- | ------ | ---- | ------------------- |
+| `LOG_PERSIST_ENABLED` | `logs.enabled` | boolean | `true` |
+| `LOG_PERSIST_LEVEL` | `logs.level` | level; **empty inherits `LOG_LEVEL`** | `warn` |
+| `LOG_LEVEL` | `logs.consoleLevel` **and** the last fallback for `logs.level` | level | **no change** to the console; `logs.level` stays `warn` |
+| `LOG_PERSIST_RETENTION_DAYS` | `logs.retentionDays` | days; `0` = no age cutoff | `3` |
+| `LOG_PERSIST_MAX_RECORDS` | `logs.maxRecords` | rows; integer | `2000` |
+| `LOG_PERSIST_MAX_PAYLOAD_BYTES` | `logs.maxPayloadBytes` | UTF-8 bytes; integer | `4096` |
+| `LOG_PERSIST_MAX_LOGS_PER_MINUTE` | `logs.maxLogsPerMinute` | logs per 60 s; `0` = off | `600` |
+| `LOG_PERSIST_WRITE_FLUSH_MS` | `logs.writeFlushMs` | milliseconds; integer | `1000` |
+| `LOG_PERSIST_WRITE_BATCH_SIZE` | `logs.writeBatchSize` | entries per write; integer | `50` |
+
+Two of these need an example rather than a description, because `LOG_LEVEL` is a **shared** default
+rather than a console-only setting.
+
+**`LOG_PERSIST_LEVEL=` — present but empty is an instruction, not a mistake.** It says "inherit
+`LOG_LEVEL`":
+
+```bash
+LOG_PERSIST_LEVEL=      # empty → fall through
+LOG_LEVEL=info          # → logs.level = 'info', logs.consoleLevel = 'info'
+```
+
+**`LOG_LEVEL` sets the console level and is also the last fallback for the persist level.** The two
+resolve along separate chains, and `LOG_LEVEL` is a candidate in both:
+
+```text
+logs.consoleLevel:  logs.consoleLevel  →  consoleLevel  →  LOG_LEVEL  →  (no default: unchanged)
+logs.level:         logs.level  →  level  →  LOG_PERSIST_LEVEL  →  TELEMETRY_LOG_LEVEL  →  LOG_LEVEL  →  'warn'
+```
+
+So `LOG_LEVEL=debug` on its own makes debug lines **both** print and persist, and
+`LOG_PERSIST_LEVEL=error` next to it keeps the console at `debug` while persistence stops at `error`:
+
+```bash
+LOG_LEVEL=debug          # console: debug,  persist: debug
+LOG_PERSIST_LEVEL=error  # console: debug,  persist: error
+```
+
+That asymmetry is deliberate: a deployment that sets one variable gets one consistent verbosity,
+while a deployment that wants quiet storage and a chatty console sets both. Because `LOG_LEVEL` is
+the last candidate in the persist chain, a build that sets only `LOG_LEVEL=error` persists at
+`error` — not at the `'warn'` default.
+
+### 13.5 REST
+
+| Variable | Option | Unit | Default when absent |
+| -------- | ------ | ---- | ------------------- |
+| `TELEMETRY_REST_ENABLED` | `rest.enabled` | boolean | `false` — nothing uploads |
+| `ERROR_TRACKING_REST_URL` | `rest.errorsUrl` | absolute `http(s)` or a relative path | `undefined` |
+| `LOG_TRACKING_REST_URL` | `rest.logsUrl` | absolute `http(s)` or a relative path | `undefined` |
+| `TELEMETRY_SYNC_INTERVAL_MS` | `rest.intervalMs` | milliseconds; integer | `30000` |
+| `TELEMETRY_SYNC_BATCH_SIZE` | `rest.batchSize` | records per request; integer | `50` |
+
+`rest.enabled` needs **both** the flag and a URL: an explicit `false` wins over the "a URL implies
+enabled" inference, so `TELEMETRY_REST_ENABLED=false` with a URL configured keeps the build local and
+`mode` correctly reports `'local'`. See §8 ("How `enabled` is derived") for the full rule.
+
+There is no variable for `rest.credentials`, `rest.getHeaders`, `rest.transport`,
+`rest.requireHttps` or `rest.onTerminalFailure`. Headers and transports are code, because they carry
+secrets and behaviour that must not be settable from the environment.
+
+### 13.6 Legacy aliases
+
+These are still read so an earlier configuration keeps working. The specific names above win when
+both are set.
+
+| Legacy variable | Now spelled | Note |
+| --------------- | ----------- | ---- |
+| `TELEMETRY_ERRORS_ENABLED` | `ERROR_TRACKING_ENABLED` | |
+| `TELEMETRY_LOGS_ENABLED` | `LOG_PERSIST_ENABLED` | |
+| `TELEMETRY_PERSIST_LEVEL` | `LOG_PERSIST_LEVEL` | persist level |
+| `TELEMETRY_LOG_LEVEL` | `LOG_PERSIST_LEVEL` | persist level only — it never sets the console level, so an existing deployment's console output is unchanged |
+| `TELEMETRY_ERRORS_URL` | `ERROR_TRACKING_REST_URL` | |
+| `TELEMETRY_LOGS_URL` | `LOG_TRACKING_REST_URL` | |
+
+### 13.7 Parsing rules
+
+| Input | Result | Why |
+| ----- | ------ | --- |
+| `true`, `1`, `yes`, `on` | `true` | recognised boolean |
+| `false`, `0`, `no`, `off` | `false` | recognised boolean |
+| `maybe` | ignored → default | not a recognised boolean |
+| empty string | ignored → default | present-but-empty counts as absent |
+| `lots` | ignored → default | not a number |
+| `-5` | ignored → default | negative numbers are rejected |
+| `10.9` | `10` | integer options are floored |
+| `0.5` for `retentionDays` | `0.5` — twelve hours | retention is **not** floored, so a fraction is meaningful |
+| `verbose` for a level | ignored → previous value | not a recognised level (`trace`, `debug`, `info`, `warn`, `error`, `off`, plus `none`/`silent` as synonyms for `off`) |
+
+`0` is meaningful where a limit can sensibly be disabled — `retentionDays`, `maxEventsPerMinute`,
+`maxRepeatsPerMinute`, `maxLogsPerMinute` — and rejected as a mistake where it cannot
+(`maxRecords`, `maxPayloadBytes`).
+
+### 13.8 A complete `.env`
+
+```bash
+# Identity
+VITE_APP_NAME=checkout
+VITE_APP_ENV=production
+
+# Error tracking (client-side, IndexedDB)
+VITE_ERROR_TRACKING_ENABLED=true
+VITE_ERROR_TRACKING_RETENTION_DAYS=7
+VITE_ERROR_TRACKING_MAX_RECORDS=500
+VITE_ERROR_TRACKING_MAX_PAYLOAD_BYTES=16384
+
+# Log persistence (its own IndexedDB store)
+# Level: trace|debug|info|warn|error|off; empty = inherit VITE_LOG_LEVEL
+VITE_LOG_PERSIST_ENABLED=true
+VITE_LOG_PERSIST_LEVEL=
+VITE_LOG_PERSIST_RETENTION_DAYS=3
+VITE_LOG_PERSIST_MAX_RECORDS=2000
+VITE_LOG_PERSIST_MAX_PAYLOAD_BYTES=4096
+
+# REST sync. IndexedDB remains the offline outbox; pending records upload when online.
+# Needs the flag AND a URL (absolute http(s) or a relative path).
+VITE_TELEMETRY_REST_ENABLED=false
+VITE_ERROR_TRACKING_REST_URL=/api/telemetry/errors
+VITE_LOG_TRACKING_REST_URL=/api/telemetry/logs
+VITE_TELEMETRY_SYNC_INTERVAL_MS=30000
+VITE_TELEMETRY_SYNC_BATCH_SIZE=50
+```
+
+```ts
+// src/main.ts — one line activates the whole file
+initTelemetry({ env: 'VITE_' });
+```
+
+Every value above matches a built-in default, so this file changes nothing until you edit a line —
+which is exactly what makes it a good starting point. `VITE_TELEMETRY_REST_ENABLED=false` is what
+keeps the build local even though two URLs are present.
+
+For the per-variable examples and a worked `.env.development`, see
+[examples/vanilla/config/02-environment-variables.md](../examples/vanilla/config/02-environment-variables.md).
+For the "what if I omit it" table, see [DEFAULTS.md §10](DEFAULTS.md#10-environment-variables--what-happens-if-the-variable-is-not-set).

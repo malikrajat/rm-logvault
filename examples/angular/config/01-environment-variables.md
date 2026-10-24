@@ -73,7 +73,7 @@ The prefix is yours to choose: `env: true` searches `['VITE_', 'NEXT_PUBLIC_', '
 | Variable suffix | Option | Unit | Default |
 | --- | --- | --- | --- |
 | `LOG_PERSIST_ENABLED` | `logs.enabled` | boolean | `true` |
-| `LOG_LEVEL` | `logs.consoleLevel` | level | **unchanged** |
+| `LOG_LEVEL` | `logs.consoleLevel`, and the last fallback for `logs.level` | level | **unchanged** console; persist stays `warn` |
 | `LOG_PERSIST_LEVEL` | `logs.level` | level; empty inherits `LOG_LEVEL` | `warn` |
 | `LOG_PERSIST_RETENTION_DAYS` | `logs.retentionDays` | days; `0` = no age deletion | `3` |
 | `LOG_PERSIST_MAX_RECORDS` | `logs.maxRecords` | rows | `2000` |
@@ -82,7 +82,17 @@ The prefix is yours to choose: `env: true` searches `['VITE_', 'NEXT_PUBLIC_', '
 | `LOG_PERSIST_WRITE_FLUSH_MS` | `logs.writeFlushMs` | milliseconds | `1000` |
 | `LOG_PERSIST_WRITE_BATCH_SIZE` | `logs.writeBatchSize` | entries per write | `50` |
 
-`LOG_LEVEL` sets the **console** level and `LOG_PERSIST_LEVEL` sets the **persist** level. An empty
+`LOG_LEVEL` sets the **console** level and `LOG_PERSIST_LEVEL` sets the **persist** level — and
+`LOG_LEVEL` is also the **last fallback** for the persist level, because it is a candidate in both
+chains:
+
+```text
+logs.consoleLevel:  logs.consoleLevel  →  consoleLevel  →  LOG_LEVEL  →  (no default: unchanged)
+logs.level:         logs.level  →  level  →  LOG_PERSIST_LEVEL  →  TELEMETRY_LOG_LEVEL  →  LOG_LEVEL  →  'warn'
+```
+
+So `LOG_LEVEL=debug` alone both prints and persists debug lines, while adding
+`LOG_PERSIST_LEVEL=error` keeps the console at `debug` and stops persistence at `error`. An empty
 variable counts as absent, which is how "empty persist level inherits the console level" works.
 
 ## REST upload
