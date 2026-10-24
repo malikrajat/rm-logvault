@@ -3,7 +3,7 @@
 > Offline-first browser error tracking, logging and diagnostics export. IndexedDB-first (write-ahead outbox), optional REST sync with retry/backoff, self-contained XSS-safe HTML/JSON diagnostics report with page-load drill-down on Ctrl+Shift+Alt+D. Zero runtime dependencies. Core 42.16 kB min+gzip (43 kB regression budget). MIT. TypeScript, dual ESM+CJS.
 
 package: @codewithrajat/rm-logvault
-version: 1.0.1
+version: 1.0.3
 engines: node >=18 (tooling only; runtime is browser/worker/SSR-safe)
 import specifiers: @codewithrajat/rm-logvault, @codewithrajat/rm-logvault/react, @codewithrajat/rm-logvault/vue, @codewithrajat/rm-logvault/angular, @codewithrajat/rm-logvault/axios, @codewithrajat/rm-logvault/fetch, @codewithrajat/rm-logvault/worker, @codewithrajat/rm-logvault/react-query, @codewithrajat/rm-logvault/http, @codewithrajat/rm-logvault/storage, @codewithrajat/rm-logvault/testing, @codewithrajat/rm-logvault/package.json
 optional peers: react>=17, vue>=3, @angular/core>=15, axios>=1, @tanstack/react-query>=4
@@ -13,7 +13,9 @@ type: module
 main: dist/index.cjs | module: dist/index.js | types: dist/index.d.ts
 size-limit: dist/index.js <= 43 kB min+gzip (measured 42.16 kB, minified+gzipped with all deps)
 publishConfig: { access: public, registry: https://registry.npmjs.org/ } (NO provenance: releases are cut from a maintainer's checkout, where npm refuses to fabricate an attestation. Verify against dist.integrity instead.)
-files: dist, docs, examples, README.md, CHANGELOG.md, CONTRIBUTING.md, SECURITY.md, LICENSE, llms.txt, llms-full.txt
+files: dist, README.md, CHANGELOG.md, CONTRIBUTING.md, SECURITY.md, LICENSE, llms.txt, llms-full.txt
+       (docs/ and examples/ are NOT published: they stay in the repository and are linked by
+        absolute GitHub URL. Add either to `files` to ship it.)
 
 INVARIANTS
 - The public API never throws. Fallible internals return Result<T,R> = {ok:true,value} | {ok:false,reason}.
@@ -222,7 +224,8 @@ Env var suffixes (prefixed by VITE_ | NEXT_PUBLIC_ | REACT_APP_):
   ERROR_TRACKING_MAX_RECORDS->errorsMaxRecords, ERROR_TRACKING_MAX_PAYLOAD_BYTES->errorsMaxPayloadBytes,
   ERROR_TRACKING_MAX_EVENTS_PER_MINUTE->errorsMaxEventsPerMinute,
   ERROR_TRACKING_MAX_REPEATS_PER_MINUTE->errorsMaxRepeatsPerMinute,
-  LOG_PERSIST_ENABLED->logsEnabled, LOG_LEVEL->consoleLevel, LOG_PERSIST_LEVEL->persistLevel,
+  LOG_PERSIST_ENABLED->logsEnabled, LOG_LEVEL->consoleLevel (also the LAST fallback for the persist level),
+  LOG_PERSIST_LEVEL->persistLevel,
   LOG_PERSIST_RETENTION_DAYS->logsRetentionDays, LOG_PERSIST_MAX_RECORDS->logsMaxRecords,
   LOG_PERSIST_MAX_PAYLOAD_BYTES->logsMaxPayloadBytes,
   LOG_PERSIST_MAX_LOGS_PER_MINUTE->logsMaxLogsPerMinute,
@@ -238,6 +241,12 @@ env parsing: absent/empty/whitespace == not set. number: non-number, NaN, Infini
   (the option then falls back to its default); 0 is preserved; integers are floored except retentionDays
   (fractional days allowed, 0.5 == 12h). An empty LOG_PERSIST_LEVEL therefore inherits LOG_LEVEL.
 Booleans: true/1/yes/on and false/0/no/off, trimmed + lowercased; anything else ignored.
+
+AN UNSET VARIABLE HAS NO DEFAULT OF ITS OWN. The env layer only ever SUPPLIES a value, so a missing,
+empty or unparseable variable makes the option fall through to the same built-in default it has in
+code (## 2). Nothing is read at all unless TelemetryOptions.env is passed: initTelemetry({appName:'x'})
+ignores a .env full of VITE_ERROR_TRACKING_* variables. Per-parameter table of "what is it when I do
+not set it": docs/DEFAULTS.md.
 
 ### Logger
 logger: Logger :: the shared facade.

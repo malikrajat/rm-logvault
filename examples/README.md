@@ -16,7 +16,9 @@ changes. The tier guides below are references: better once you know what you are
 
 Each guide quotes real defaults from `src/core/config.ts`. For the exhaustive reference — every
 option, its unit, its default and its edge cases — see
-[docs/API.md](../docs/API.md#every-option-annotated).
+[docs/API.md](../docs/API.md#every-option-annotated). For the answer to "I did not set this, so what
+is it?" — every option and environment variable with the value in force when it is absent — see
+[docs/DEFAULTS.md](../docs/DEFAULTS.md).
 
 ---
 

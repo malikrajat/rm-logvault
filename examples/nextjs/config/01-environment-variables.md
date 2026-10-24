@@ -123,7 +123,7 @@ The full treatment — `handle.events`, context builders, the sink registry and 
 | Variable | Nested option | Flat alias | Unit | Default |
 | --- | --- | --- | --- | --- |
 | `NEXT_PUBLIC_LOG_PERSIST_ENABLED` | `logs.enabled` | — | boolean | `true` |
-| `NEXT_PUBLIC_LOG_LEVEL` | `logs.consoleLevel` | `consoleLevel` | level | **unchanged** |
+| `NEXT_PUBLIC_LOG_LEVEL` | `logs.consoleLevel`, and the last fallback for `logs.level` | `consoleLevel` | level | **unchanged** console; persist stays `warn` |
 | `NEXT_PUBLIC_LOG_PERSIST_LEVEL` | `logs.level` | `level` | level; empty inherits `LOG_LEVEL` | `warn` |
 | `NEXT_PUBLIC_LOG_PERSIST_RETENTION_DAYS` | `logs.retentionDays` | `logRetentionDays` | days; `0` = no age deletion | `3` |
 | `NEXT_PUBLIC_LOG_PERSIST_MAX_RECORDS` | `logs.maxRecords` | `maxLogs` | rows | `2000` |
@@ -133,8 +133,9 @@ The full treatment — `handle.events`, context builders, the sink registry and 
 | `NEXT_PUBLIC_LOG_PERSIST_WRITE_BATCH_SIZE` | `logs.writeBatchSize` | — | entries per write | `50` |
 
 `NEXT_PUBLIC_LOG_LEVEL` sets the **console** level and `NEXT_PUBLIC_LOG_PERSIST_LEVEL` the **persist**
-level. An empty variable counts as absent, which is how "empty persist level inherits the console
-level" works.
+level — and `NEXT_PUBLIC_LOG_LEVEL` is also the **last fallback** for the persist level, so a build
+that sets only that one variable persists at the same level the console prints. An empty variable
+counts as absent, which is how "empty persist level inherits the console level" works.
 
 > **Source note.** The flat `level` alias means the **persist** level, matching `logs.level` — not the
 > console level. Use `consoleLevel` for `logs.consoleLevel`. Mixing them up is the easiest mistake to

@@ -1220,7 +1220,7 @@ interface EnvOptions {
     readonly errorsMaxRepeatsPerMinute?: number;
     /** `LOG_PERSIST_ENABLED`. */
     readonly logsEnabled?: boolean;
-    /** `LOG_LEVEL` — the **console** level applied at initialisation. */
+    /** `LOG_LEVEL` — the **console** level applied at initialisation, and the last fallback for the persist level. */
     readonly consoleLevel?: string;
     /** `LOG_PERSIST_LEVEL` — the **persist** level. Falls back to `LOG_LEVEL` when empty. */
     readonly persistLevel?: string;
@@ -1289,7 +1289,7 @@ interface EnvOptions {
  * | Variable                          | Option                    | Unit                        | Default |
  * | --------------------------------- | ------------------------- | --------------------------- | ------- |
  * | `LOG_PERSIST_ENABLED`             | `logs.enabled`            | boolean                     | `true`  |
- * | `LOG_LEVEL`                       | `logs.consoleLevel`       | level                       | unchanged |
+ * | `LOG_LEVEL`                       | `logs.consoleLevel`, then the last fallback for `logs.level` | level | unchanged; persist stays `warn` |
  * | `LOG_PERSIST_LEVEL`               | `logs.level`              | level; empty inherits `LOG_LEVEL` | `warn` |
  * | `LOG_PERSIST_RETENTION_DAYS`      | `logs.retentionDays`      | days, `0` = no age deletion | `3`     |
  * | `LOG_PERSIST_MAX_RECORDS`         | `logs.maxRecords`         | rows                        | `2000`  |

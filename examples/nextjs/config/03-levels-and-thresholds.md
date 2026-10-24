@@ -180,14 +180,16 @@ useEffect(() => {
 
 | Variable | Option | Notes |
 | --- | --- | --- |
-| `NEXT_PUBLIC_LOG_LEVEL` | `logs.consoleLevel` | The **console** threshold. |
+| `NEXT_PUBLIC_LOG_LEVEL` | `logs.consoleLevel`, and the last fallback for `logs.level` | The **console** threshold. |
 | `NEXT_PUBLIC_LOG_PERSIST_LEVEL` | `logs.level` | An empty value inherits the console level. |
 | `NEXT_PUBLIC_ERROR_TRACKING_MAX_PAYLOAD_BYTES` | `errors.maxPayloadBytes` | The error record budget. |
 | `NEXT_PUBLIC_LOG_PERSIST_MAX_PAYLOAD_BYTES` | `logs.maxPayloadBytes` | The log record budget. |
 
 `NEXT_PUBLIC_LOG_LEVEL` sets the **console** level; `NEXT_PUBLIC_LOG_PERSIST_LEVEL` sets the **persist**
-level, and an empty value there inherits the console one. The full table, the parsing rules and the
-precedence order are in [environment variables](./01-environment-variables.md).
+level, and an empty value there inherits the console one. It is also the **last fallback** for the
+persist level, so a build that sets only `NEXT_PUBLIC_LOG_LEVEL` prints and persists at the same level.
+The full table, the parsing rules and the precedence order are in
+[environment variables](./01-environment-variables.md).
 
 ## Try it yourself
 

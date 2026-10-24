@@ -132,7 +132,7 @@ shortcut. A nested option with no alias (a dash in the tables above) is reachabl
 | Variable | Option | Unit | Default | Flat alias |
 | --- | --- | --- | --- | --- |
 | `VITE_LOG_PERSIST_ENABLED` | `logs.enabled` | boolean | `true` | — |
-| `VITE_LOG_LEVEL` | `logs.consoleLevel` | level | **unchanged** | `consoleLevel` |
+| `VITE_LOG_LEVEL` | `logs.consoleLevel`, and the last fallback for `logs.level` | level | **unchanged** console; persist stays `warn` | `consoleLevel` |
 | `VITE_LOG_PERSIST_LEVEL` | `logs.level` | level; empty inherits `VITE_LOG_LEVEL` | `warn` | `level` |
 | `VITE_LOG_PERSIST_RETENTION_DAYS` | `logs.retentionDays` | days; `0` = no age deletion | `3` | `logRetentionDays` |
 | `VITE_LOG_PERSIST_MAX_RECORDS` | `logs.maxRecords` | rows | `2000` | `maxLogs` |
@@ -143,8 +143,10 @@ shortcut. A nested option with no alias (a dash in the tables above) is reachabl
 
 `VITE_LOG_LEVEL` sets the **console** level and `VITE_LOG_PERSIST_LEVEL` sets the **persist** level.
 They are different questions, and leaving the persist one empty is how you say "inherit the console
-level": an empty variable counts as absent. The flat aliases keep that distinction: `level` is the
-**persist** level and `consoleLevel` is the console one.
+level": an empty variable counts as absent. `VITE_LOG_LEVEL` is also the **last fallback** for the
+persist level, so a build that sets only that one variable prints and persists at the same level. The
+flat aliases keep that distinction: `level` is the **persist** level and `consoleLevel` is the console
+one.
 
 ## REST upload
 

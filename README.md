@@ -82,6 +82,7 @@
 - [**Worker failures**](examples/vanilla/more-advanced/07-workers-and-dynamic-imports.md) - The capture paths a global handler cannot see, and `withChunkCapture`.
 - [**Duplicates and floods**](examples/vanilla/more-advanced/08-dedupe-throttling-and-testing.md) - The dedupe rule, `toError`, per-failure throttling and the test doubles.
 - [**Configuration**](#configuration) - Every option, default and environment variable.
+- [**Defaults**](docs/DEFAULTS.md) - What every option and variable is when you do not set it, and what that value means.
 - [**Options cheatsheet**](docs/OPTIONS-CHEATSHEET.md) - Every option with its real default inline, and six presets.
 - [**API Reference**](docs/API.md) - Every exported symbol, with signatures and examples.
 - [**Errors vs. logs**](docs/ERRORS-VS-LOGS.md) - Which call writes which database, and the one rule that keeps them apart.
@@ -1521,6 +1522,13 @@ is persisted — call it from browser code only.
 `initTelemetry({ ... })` takes one object. Every field is optional and every field has a safe
 default, so `initTelemetry({ appName: 'my-app' })` is a complete configuration.
 
+The tables below give each option's default. If what you actually want to know is **"I never set
+this, so what am I getting right now, and what does it do?"**, read
+[docs/DEFAULTS.md](docs/DEFAULTS.md) — one row per option and per environment variable, including the
+three defaults that surprise people: the shortcut is installed unless you disable it, `env` is off so
+a `.env` file is inert until you pass `env: true`, and `logs.level` is `warn` so `logger.info` calls
+are not stored.
+
 Two rules apply everywhere:
 
 - **Precedence:** explicit option > environment layer (`fromEnv`) > built-in default.
@@ -1652,7 +1660,7 @@ order. The first non-empty match wins.
 | `ERROR_TRACKING_MAX_EVENTS_PER_MINUTE` | `errors.maxEventsPerMinute` | events / 60 s; `0` = unlimited         | `120`     |
 | `ERROR_TRACKING_MAX_REPEATS_PER_MINUTE` | `errors.maxRepeatsPerMinute` | records per fingerprint / 60 s; `0` = off | `12`  |
 | `LOG_PERSIST_ENABLED`                  | `logs.enabled`              | `true`/`false`                         | `true`    |
-| `LOG_LEVEL`                            | `logs.consoleLevel`         | level — console only                   | unchanged |
+| `LOG_LEVEL`                            | `logs.consoleLevel`, then the last fallback for `logs.level` | level | unchanged; persist stays `warn` |
 | `LOG_PERSIST_LEVEL`                    | `logs.level`                | level; empty inherits `LOG_LEVEL`      | `warn`    |
 | `LOG_PERSIST_RETENTION_DAYS`           | `logs.retentionDays`        | days; `0` = no age cutoff              | `3`       |
 | `LOG_PERSIST_MAX_RECORDS`              | `logs.maxRecords`           | rows                                   | `2000`    |
@@ -1680,6 +1688,12 @@ never touched the console, so an existing deployment's console output does not c
 unit and edge case is spelled out in
 [docs/API.md](docs/API.md#every-option-annotated).
 
+**The `Default` column is what you get when the variable is absent** — and the same value you get when
+`env` is not passed at all. An unset variable is not a special case: the environment layer contributes
+nothing, so the option keeps its built-in default. That is the whole property behind
+[docs/DEFAULTS.md](docs/DEFAULTS.md), which lists every option and every variable side by side with
+what the default actually does, including the ones with no variable at all.
+
 ```ts
 // src/main.ts
 import { initTelemetry } from '@codewithrajat/rm-logvault';
@@ -1697,7 +1711,8 @@ nested one. Use `env:` for the environment, or `fromEnv()` when you want to read
 them yourself:
 
 The exhaustive reference, with copy-pasteable presets, is
-[docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+[docs/CONFIGURATION.md](docs/CONFIGURATION.md); the "what if I omit it" table for every option and
+variable is [docs/DEFAULTS.md](docs/DEFAULTS.md).
 
 ---
 
@@ -1937,7 +1952,7 @@ Need assistance? We're here to help!
 | Bug Reports       | [Report Bug](https://github.com/malikrajat/rm-logvault/issues/new?template=bug_report.md)                          | Technical issues   |
 | Feature Requests  | [Request Feature](https://github.com/malikrajat/rm-logvault/issues/new?template=feature_request.md)                | New features       |
 | Discussions       | [Join Discussion](https://github.com/malikrajat/rm-logvault/discussions)                                          | General questions  |
-| Email             | [mr.rajatmalik@gmail.com](mailto:mr.rajatmalik@gmail.com?subject=rm-logvault%20Support)                        | Direct support     |
+| Email             | [support@rajatmalik.dev](mailto:support@rajatmalik.dev?subject=rm-logvault%20Support)                        | Direct support     |
 
 ### Documentation
 
@@ -1950,7 +1965,8 @@ Need assistance? We're here to help!
 - [docs/API.md](docs/API.md) — every exported symbol, with signatures and examples.
 - [docs/ERRORS-VS-LOGS.md](docs/ERRORS-VS-LOGS.md) — which call writes which database, and how not to file one event twice.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — the capture pipeline, the diagnostics-export path, sequence diagrams and the load-bearing mechanisms.
-- [docs/CONFIGURATION.md](docs/CONFIGURATION.md) — the exhaustive option reference, precedence and presets.
+- [docs/CONFIGURATION.md](docs/CONFIGURATION.md) — the exhaustive option reference, precedence, the environment-variable reference and presets.
+- [docs/DEFAULTS.md](docs/DEFAULTS.md) — what every option and environment variable is when you do not set it, and what that value does.
 - [docs/OPTIONS-CHEATSHEET.md](docs/OPTIONS-CHEATSHEET.md) — the complete options object, every default inline, a deep dive per option and six presets.
 - [docs/REST-CONTRACT.md](docs/REST-CONTRACT.md) — the wire format, JSON Schema, status codes and server obligations.
 - [docs/SECURITY.md](docs/SECURITY.md) — threat model, redaction design, XSS safety and disclosure policy.
@@ -2167,7 +2183,7 @@ Author of 10+ open-source libraries and 100+ technical articles, driving innovat
 ### GET IN TOUCH
 
 - Portfolio:  [rajatmalik.dev](https://rajatmalik.dev)
-- Email:      [mr.rajatmalik@gmail.com](mailto:mr.rajatmalik@gmail.com)
+- Email:      [support@rajatmalik.dev](mailto:support@rajatmalik.dev)
 - LinkedIn:   [errajatmalik](https://linkedin.com/in/errajatmalik)
 - GitHub:     [@malikrajat](https://github.com/malikrajat)
 - npm:        [rajatmalik](https://www.npmjs.com/~rajatmalik)

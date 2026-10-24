@@ -865,6 +865,11 @@ when both `import.meta.env` and `process.env` are absent.
 Returns `EnvOptions` — a flat partial-options object. Every field is present **only** when the
 matching variable was found, non-empty and parseable, so an absent variable never overrides a default.
 
+**Nothing is read until you opt in.** `fromEnv` is a reader, not a switch: pass `env: true` (or a
+prefix) to `initTelemetry` for the layer to take effect. `initTelemetry({ appName: 'x' })` reads no
+variable at all. See [DEFAULTS.md](DEFAULTS.md#10-environment-variables--what-happens-if-the-variable-is-not-set)
+for what each option resolves to when its variable is absent — it is always the built-in default.
+
 Recognised suffixes, with `VITE_` shown as the prefix. The prefix itself is yours
 (`NEXT_PUBLIC_`, `REACT_APP_`, …); the suffix is what `fromEnv` looks for.
 
@@ -896,7 +901,7 @@ Recognised suffixes, with `VITE_` shown as the prefix. The prefix itself is your
 | Variable                               | Option                  | Unit                                        | Default   |
 |----------------------------------------|-------------------------|---------------------------------------------|-----------|
 | `VITE_LOG_PERSIST_ENABLED`             | `logs.enabled`          | `true`/`false`                              | `true`    |
-| `VITE_LOG_LEVEL`                       | `logs.consoleLevel`     | level                                       | unchanged |
+| `VITE_LOG_LEVEL`                       | `logs.consoleLevel`, then the last fallback for `logs.level` | level | unchanged; persist stays `warn` |
 | `VITE_LOG_PERSIST_LEVEL`               | `logs.level`            | level; **empty inherits `VITE_LOG_LEVEL`**  | `warn`    |
 | `VITE_LOG_PERSIST_RETENTION_DAYS`      | `logs.retentionDays`    | days; `0` = never delete by age             | `3`       |
 | `VITE_LOG_PERSIST_MAX_RECORDS`         | `logs.maxRecords`       | rows                                        | `2000`    |

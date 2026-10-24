@@ -38,52 +38,62 @@ For each name, `import.meta.env` is consulted before `process.env`. **Nothing is
 Suffixes are shown with `VITE_` as the prefix. The prefix is yours; the suffix is what the library looks
 for, so `NEXT_PUBLIC_ERROR_TRACKING_REST_URL` is the Next.js spelling of the same thing.
 
+**Read the `Default` column as "what you get when the variable is absent."** The environment layer
+supplies nothing when a variable is missing, so the option falls through to the same built-in default
+you would get by omitting it in code. Adding a line changes exactly that one option; deleting the line
+restores exactly the default in the table. That is what makes this layer safe to adopt one variable at
+a time, and it is why every row below has a concrete value rather than a vague "sensible default".
+
+The options that have **no** environment variable at all — the shortcut, `mode`, `consent`,
+`errors.captureCsp`, `rest.getHeaders` and the callbacks — are listed with their defaults in
+[docs/DEFAULTS.md](../../../docs/DEFAULTS.md).
+
 ### Identity and lifecycle
 
-| Variable | Option | Values | Default |
+| Variable | Option | Values | Default (value when absent) |
 | --- | --- | --- | --- |
-| `VITE_APP_NAME` | `appName` | string | none |
-| `VITE_APP_VERSION` | `appVersion` | string | none |
-| `VITE_BUILD_ID` | `buildId` | string | none |
-| `VITE_APP_ENV`, `VITE_ENVIRONMENT` | `environment` | string | none |
-| `VITE_TELEMETRY_ENABLED` | `enabled` | `true`/`false` | `true` |
-| `VITE_TELEMETRY_DB_PREFIX` | `dbPrefix` | string | `rm-logvault` |
-| `VITE_TELEMETRY_OPEN_TIMEOUT_MS` | `openTimeoutMs` | milliseconds | `5000` |
+| `VITE_APP_NAME` | `appName` | string | none — the field is omitted from the record |
+| `VITE_APP_VERSION` | `appVersion` | string | none — omitted |
+| `VITE_BUILD_ID` | `buildId` | string | none — omitted |
+| `VITE_APP_ENV`, `VITE_ENVIRONMENT` | `environment` | string | none — omitted, **not** inferred |
+| `VITE_TELEMETRY_ENABLED` | `enabled` | `true`/`false` | `true` — capture is on |
+| `VITE_TELEMETRY_DB_PREFIX` | `dbPrefix` | string | `rm-logvault` — databases `rm-logvault-errors` / `-logs` |
+| `VITE_TELEMETRY_OPEN_TIMEOUT_MS` | `openTimeoutMs` | milliseconds | `5000` — then storage is `unavailable` and capture continues console-only |
 
 ### Errors
 
-| Variable | Option | Unit | Default |
+| Variable | Option | Unit | Default (value when absent) |
 | --- | --- | --- | --- |
-| `VITE_ERROR_TRACKING_ENABLED` | `errors.enabled` | `true`/`false` | `true` |
-| `VITE_ERROR_TRACKING_RETENTION_DAYS` | `errors.retentionDays` | days; `0` = never delete by age | `7` |
-| `VITE_ERROR_TRACKING_MAX_RECORDS` | `errors.maxRecords` | rows | `500` |
-| `VITE_ERROR_TRACKING_MAX_PAYLOAD_BYTES` | `errors.maxPayloadBytes` | UTF-8 bytes per record | `16384` |
-| `VITE_ERROR_TRACKING_MAX_EVENTS_PER_MINUTE` | `errors.maxEventsPerMinute` | events / 60 s; `0` = unlimited | `120` |
-| `VITE_ERROR_TRACKING_MAX_REPEATS_PER_MINUTE` | `errors.maxRepeatsPerMinute` | records per fingerprint / 60 s; `0` = off | `12` |
+| `VITE_ERROR_TRACKING_ENABLED` | `errors.enabled` | `true`/`false` | `true` — errors are captured |
+| `VITE_ERROR_TRACKING_RETENTION_DAYS` | `errors.retentionDays` | days; `0` = never delete by age | `7` days |
+| `VITE_ERROR_TRACKING_MAX_RECORDS` | `errors.maxRecords` | rows | `500` rows |
+| `VITE_ERROR_TRACKING_MAX_PAYLOAD_BYTES` | `errors.maxPayloadBytes` | UTF-8 bytes per record | `16384` bytes |
+| `VITE_ERROR_TRACKING_MAX_EVENTS_PER_MINUTE` | `errors.maxEventsPerMinute` | events / 60 s; `0` = unlimited | `120` per minute, page-wide |
+| `VITE_ERROR_TRACKING_MAX_REPEATS_PER_MINUTE` | `errors.maxRepeatsPerMinute` | records per fingerprint / 60 s; `0` = off | `12` per fingerprint per minute |
 
 ### Logs
 
-| Variable | Option | Unit | Default |
+| Variable | Option | Unit | Default (value when absent) |
 | --- | --- | --- | --- |
-| `VITE_LOG_PERSIST_ENABLED` | `logs.enabled` | `true`/`false` | `true` |
-| `VITE_LOG_LEVEL` | `logs.consoleLevel` | level | unchanged |
-| `VITE_LOG_PERSIST_LEVEL` | `logs.level` | level; **empty inherits `VITE_LOG_LEVEL`** | `warn` |
-| `VITE_LOG_PERSIST_RETENTION_DAYS` | `logs.retentionDays` | days; `0` = never delete by age | `3` |
-| `VITE_LOG_PERSIST_MAX_RECORDS` | `logs.maxRecords` | rows | `2000` |
-| `VITE_LOG_PERSIST_MAX_PAYLOAD_BYTES` | `logs.maxPayloadBytes` | UTF-8 bytes per record | `4096` |
-| `VITE_LOG_PERSIST_MAX_LOGS_PER_MINUTE` | `logs.maxLogsPerMinute` | logs / 60 s; `0` = unlimited | `600` |
-| `VITE_LOG_PERSIST_WRITE_FLUSH_MS` | `logs.writeFlushMs` | milliseconds | `1000` |
-| `VITE_LOG_PERSIST_WRITE_BATCH_SIZE` | `logs.writeBatchSize` | entries | `50` |
+| `VITE_LOG_PERSIST_ENABLED` | `logs.enabled` | `true`/`false` | `true` — logs are persisted |
+| `VITE_LOG_LEVEL` | `logs.consoleLevel`, then the last fallback for `logs.level` | level | unchanged console; persist stays `warn` |
+| `VITE_LOG_PERSIST_LEVEL` | `logs.level` | level; **empty inherits `VITE_LOG_LEVEL`** | `warn` — only `warn` and `error` are stored |
+| `VITE_LOG_PERSIST_RETENTION_DAYS` | `logs.retentionDays` | days; `0` = never delete by age | `3` days |
+| `VITE_LOG_PERSIST_MAX_RECORDS` | `logs.maxRecords` | rows | `2000` rows |
+| `VITE_LOG_PERSIST_MAX_PAYLOAD_BYTES` | `logs.maxPayloadBytes` | UTF-8 bytes per record | `4096` bytes |
+| `VITE_LOG_PERSIST_MAX_LOGS_PER_MINUTE` | `logs.maxLogsPerMinute` | logs / 60 s; `0` = unlimited | `600` per minute |
+| `VITE_LOG_PERSIST_WRITE_FLUSH_MS` | `logs.writeFlushMs` | milliseconds | `1000` ms — an upper bound, not a poll interval |
+| `VITE_LOG_PERSIST_WRITE_BATCH_SIZE` | `logs.writeBatchSize` | entries | `50` entries per write |
 
 ### REST upload
 
-| Variable | Option | Values | Default |
+| Variable | Option | Values | Default (value when absent) |
 | --- | --- | --- | --- |
-| `VITE_TELEMETRY_REST_ENABLED` | `rest.enabled` | `true`/`false` | `true` when a URL is set |
-| `VITE_ERROR_TRACKING_REST_URL` | `rest.errorsUrl` | absolute `http(s)` or a path | none |
-| `VITE_LOG_TRACKING_REST_URL` | `rest.logsUrl` | absolute `http(s)` or a path | none |
-| `VITE_TELEMETRY_SYNC_INTERVAL_MS` | `rest.intervalMs` | milliseconds | `30000` |
-| `VITE_TELEMETRY_SYNC_BATCH_SIZE` | `rest.batchSize` | records per request | `50` |
+| `VITE_TELEMETRY_REST_ENABLED` | `rest.enabled` | `true`/`false` | `true` when a URL is set — so `false` with no URL, and nothing uploads |
+| `VITE_ERROR_TRACKING_REST_URL` | `rest.errorsUrl` | absolute `http(s)` or a path | none — error batches are never sent |
+| `VITE_LOG_TRACKING_REST_URL` | `rest.logsUrl` | absolute `http(s)` or a path | none — log batches are never sent |
+| `VITE_TELEMETRY_SYNC_INTERVAL_MS` | `rest.intervalMs` | milliseconds | `30000` ms between successful flushes |
+| `VITE_TELEMETRY_SYNC_BATCH_SIZE` | `rest.batchSize` | records per request | `50` records per request |
 
 ## Parsing rules
 
